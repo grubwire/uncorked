@@ -1,4 +1,4 @@
-// !$*UTF8*$!
+﻿// !$*UTF8*$!
 {
 	archiveVersion = 1;
 	classes = {
@@ -125,7 +125,7 @@
 		6E355E5729D78249002D83BE /* ConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
 		6E355E5929D782B2002D83BE /* ProgramsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramsView.swift; sourceTree = "<group>"; };
 		6E355E5D29D7D85D002D83BE /* ProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramView.swift; sourceTree = "<group>"; };
-		6E40495229CCA19C006E3F1B /* Whisky.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whisky.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6E40495229CCA19C006E3F1B /* Uncorked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Uncorked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6E40495529CCA19C006E3F1B /* UncorkedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UncorkedApp.swift; sourceTree = "<group>"; };
 		6E40495729CCA19C006E3F1B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6E40495929CCA19C006E3F1B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -264,7 +264,7 @@
 		6E40494929CCA19C006E3F1B = {
 			isa = PBXGroup;
 			children = (
-				6E40495429CCA19C006E3F1B /* Whisky */,
+				6E40495429CCA19C006E3F1B /* Uncorked */,
 				6E70A4992A9A2197007799E9 /* UncorkedCmd */,
 				6EFDF64F2AAE2DA800EF622F /* UncorkedThumbnail */,
 				8CB681E42AED7C6F0018D319 /* UncorkedKit */,
@@ -279,14 +279,14 @@
 		6E40495329CCA19C006E3F1B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6E40495229CCA19C006E3F1B /* Whisky.app */,
+				6E40495229CCA19C006E3F1B /* Uncorked.app */,
 				6E70A4982A9A2197007799E9 /* UncorkedCmd */,
 				6EFDF64A2AAE2DA800EF622F /* UncorkedThumbnail.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		6E40495429CCA19C006E3F1B /* Whisky */ = {
+		6E40495429CCA19C006E3F1B /* Uncorked */ = {
 			isa = PBXGroup;
 			children = (
 				EEA5A2452A31DD65008274AE /* AppDelegate.swift */,
@@ -299,7 +299,7 @@
 				6E40495B29CCA19C006E3F1B /* Preview Content */,
 				6EB58AC82AEACE5E00B1ED3F /* Localizable.xcstrings */,
 			);
-			path = Whisky;
+			path = Uncorked;
 			sourceTree = "<group>";
 		};
 		6E40495B29CCA19C006E3F1B /* Preview Content */ = {
@@ -379,7 +379,7 @@
 			children = (
 				6E70A49A2A9A2197007799E9 /* Main.swift */,
 			);
-			path = WhiskyCmd;
+			path = UncorkedCmd;
 			sourceTree = "<group>";
 		};
 		6EFDF64F2AAE2DA800EF622F /* UncorkedThumbnail */ = {
@@ -390,15 +390,15 @@
 				6EFDF6532AAE2DA800EF622F /* UncorkedThumbnail.entitlements */,
 				6EFDF6652AAE303300EF622F /* Icons.xcassets */,
 			);
-			path = WhiskyThumbnail;
+			path = UncorkedThumbnail;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6E40495129CCA19C006E3F1B /* Whisky */ = {
+		6E40495129CCA19C006E3F1B /* Uncorked */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6E40497729CCA19D006E3F1B /* Build configuration list for PBXNativeTarget "Whisky" */;
+			buildConfigurationList = 6E40497729CCA19D006E3F1B /* Build configuration list for PBXNativeTarget "Uncorked" */;
 			buildPhases = (
 				6E40494E29CCA19C006E3F1B /* Sources */,
 				6E40494F29CCA19C006E3F1B /* Frameworks */,
@@ -412,14 +412,14 @@
 			dependencies = (
 				6EFDF6552AAE2DA800EF622F /* PBXTargetDependency */,
 			);
-			name = Whisky;
+			name = Uncorked;
 			packageProductDependencies = (
 				6E064B1129DD32A200D9A2D2 /* Sparkle */,
 				EB58FB542A499896002DC184 /* SemanticVersion */,
 				8C2AEFC72AED79B700CB568F /* UncorkedKit */,
 			);
-			productName = Whisky;
-			productReference = 6E40495229CCA19C006E3F1B /* Whisky.app */;
+			productname = Uncorked;
+			productReference = 6E40495229CCA19C006E3F1B /* Uncorked.app */;
 			productType = "com.apple.product-type.application";
 		};
 		6E70A4972A9A2197007799E9 /* UncorkedCmd */ = {
@@ -487,7 +487,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 6E40494D29CCA19C006E3F1B /* Build configuration list for PBXProject "Whisky" */;
+			buildConfigurationList = 6E40494D29CCA19C006E3F1B /* Build configuration list for PBXProject "Uncorked" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -529,7 +529,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6E40495129CCA19C006E3F1B /* Whisky */,
+				6E40495129CCA19C006E3F1B /* Uncorked */,
 				6E70A4972A9A2197007799E9 /* UncorkedCmd */,
 				6EFDF6492AAE2DA800EF622F /* UncorkedThumbnail */,
 			);
@@ -776,19 +776,19 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Whisky/Uncorked.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Uncorked/Uncorked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 43;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"Whisky/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Uncorked/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Whisky/Info.plist;
+				INFOPLIST_FILE = Uncorked/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Uncorked needs to access Terminal to launch processes in a Terminal window.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "A Windows application is trying to access the camera.";
@@ -815,19 +815,19 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Whisky/Uncorked.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Uncorked/Uncorked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 43;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"Whisky/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Uncorked/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Whisky/Info.plist;
+				INFOPLIST_FILE = Uncorked/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Uncorked needs to access Terminal to launch processes in a Terminal window.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "A Windows application is trying to access the camera.";
@@ -905,7 +905,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CODE_SIGN_ENTITLEMENTS = WhiskyThumbnail/UncorkedThumbnail.entitlements;
+				CODE_SIGN_ENTITLEMENTS = UncorkedThumbnail/UncorkedThumbnail.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 43;
@@ -916,7 +916,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = WhiskyThumbnail/Info.plist;
+				INFOPLIST_FILE = UncorkedThumbnail/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = UncorkedThumbnail;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -941,7 +941,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CODE_SIGN_ENTITLEMENTS = WhiskyThumbnail/UncorkedThumbnail.entitlements;
+				CODE_SIGN_ENTITLEMENTS = UncorkedThumbnail/UncorkedThumbnail.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 43;
@@ -952,7 +952,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = WhiskyThumbnail/Info.plist;
+				INFOPLIST_FILE = UncorkedThumbnail/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = UncorkedThumbnail;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -975,7 +975,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		6E40494D29CCA19C006E3F1B /* Build configuration list for PBXProject "Whisky" */ = {
+		6E40494D29CCA19C006E3F1B /* Build configuration list for PBXProject "Uncorked" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6E40497529CCA19D006E3F1B /* Debug */,
@@ -984,7 +984,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6E40497729CCA19D006E3F1B /* Build configuration list for PBXNativeTarget "Whisky" */ = {
+		6E40497729CCA19D006E3F1B /* Build configuration list for PBXNativeTarget "Uncorked" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6E40497829CCA19D006E3F1B /* Debug */,
