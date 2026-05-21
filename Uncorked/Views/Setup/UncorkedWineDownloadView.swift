@@ -89,10 +89,10 @@ struct UncorkedWineDownloadView: View {
     var body: some View {
         VStack {
             VStack {
-                Text("setup.whiskywine.download")
+                Text("setup.uncorkedwine.download")
                     .font(.title)
                     .fontWeight(.bold)
-                Text("setup.whiskywine.download.subtitle")
+                Text("setup.uncorkedwine.download.subtitle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -106,12 +106,12 @@ struct UncorkedWineDownloadView: View {
                         ProgressView(value: fractionProgress, total: 1)
                         HStack {
                             HStack {
-                                Text(String(format: String(localized: "setup.whiskywine.progress"),
+                                Text(String(format: String(localized: "setup.uncorkedwine.progress"),
                                             formatBytes(bytes: completedBytes),
                                             formatBytes(bytes: totalBytes)))
                                 + Text(String(" "))
                                 + (shouldShowEstimate() ?
-                                   Text(String(format: String(localized: "setup.whiskywine.eta"),
+                                   Text(String(format: String(localized: "setup.uncorkedwine.eta"),
                                                formatRemainingTime(remainingBytes: totalBytes - completedBytes)))
                                    : Text(String()))
                                 Spacer()
@@ -193,6 +193,6 @@ struct UncorkedWineDownloadView: View {
     }
 
     func proceed() {
-        path.append(.whiskyWineInstall)
+        path.append(.uncorkedWineInstall)
     }
 }

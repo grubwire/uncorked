@@ -153,9 +153,9 @@ struct ConfigView: View {
             }
         }
         .formStyle(.grouped)
-        .animation(.whiskyDefault, value: wineSectionExpanded)
-        .animation(.whiskyDefault, value: dxvkSectionExpanded)
-        .animation(.whiskyDefault, value: metalSectionExpanded)
+        .animation(.uncorkedDefault, value: wineSectionExpanded)
+        .animation(.uncorkedDefault, value: dxvkSectionExpanded)
+        .animation(.uncorkedDefault, value: metalSectionExpanded)
         .bottomBar {
             HStack {
                 Spacer()

@@ -21,7 +21,7 @@ import UncorkedKit
 
 struct WelcomeView: View {
     @State var rosettaInstalled: Bool?
-    @State var whiskyWineInstalled: Bool?
+    @State var uncorkedWineInstalled: Bool?
     @State var shouldCheckInstallStatus: Bool = false
     @Binding var path: [SetupStage]
     @Binding var showSetup: Bool
@@ -52,10 +52,10 @@ struct WelcomeView: View {
                 InstallStatusView(isInstalled: $rosettaInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   name: "Rosetta")
-                InstallStatusView(isInstalled: $whiskyWineInstalled,
+                InstallStatusView(isInstalled: $uncorkedWineInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   showUninstall: true,
-                                  name: "WhiskyWine")
+                                  name: "UncorkedWine")
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -68,22 +68,22 @@ struct WelcomeView: View {
             Spacer()
             HStack {
                 if let rosettaInstalled = rosettaInstalled,
-                   let whiskyWineInstalled = whiskyWineInstalled {
-                    if !rosettaInstalled || !whiskyWineInstalled {
+                   let uncorkedWineInstalled = uncorkedWineInstalled {
+                    if !rosettaInstalled || !uncorkedWineInstalled {
                         Button("setup.quit") {
                             exit(0)
                         }
                         .keyboardShortcut(.cancelAction)
                     }
                     Spacer()
-                    Button(rosettaInstalled && whiskyWineInstalled ? "setup.done" : "setup.next") {
+                    Button(rosettaInstalled && uncorkedWineInstalled ? "setup.done" : "setup.next") {
                         if !rosettaInstalled {
                             path.append(.rosetta)
                             return
                         }
 
-                        if !whiskyWineInstalled {
-                            path.append(.whiskyWineDownload)
+                        if !uncorkedWineInstalled {
+                            path.append(.uncorkedWineDownload)
                             return
                         }
 
@@ -98,7 +98,7 @@ struct WelcomeView: View {
 
     func checkInstallStatus() {
         rosettaInstalled = Rosetta2.isRosettaInstalled
-        whiskyWineInstalled = UncorkedWineInstaller.isWhiskyWineInstalled()
+        uncorkedWineInstalled = UncorkedWineInstaller.isUncorkedWineInstalled()
     }
 }
 
@@ -145,7 +145,7 @@ struct InstallStatusView: View {
     }
 
     func uninstall() {
-        if name == "WhiskyWine" {
+        if name == "UncorkedWine" {
             UncorkedWineInstaller.uninstall()
         }
 

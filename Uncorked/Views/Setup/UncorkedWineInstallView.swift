@@ -29,10 +29,10 @@ struct UncorkedWineInstallView: View {
     var body: some View {
         VStack {
             VStack {
-                Text("setup.whiskywine.install")
+                Text("setup.uncorkedwine.install")
                     .font(.title)
                     .fontWeight(.bold)
-                Text("setup.whiskywine.install.subtitle")
+                Text("setup.uncorkedwine.install.subtitle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()

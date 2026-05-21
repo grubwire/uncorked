@@ -20,9 +20,9 @@ import SwiftUI
 import UncorkedKit
 
 struct SettingsView: View {
-    @AppStorage("SUEnableAutomaticChecks") var whiskyUpdate = true
+    @AppStorage("SUEnableAutomaticChecks") var uncorkedUpdate = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
-    @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
+    @AppStorage("checkWhiskyWineUpdates") var checkUncorkedWineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
 
     var body: some View {
@@ -48,8 +48,8 @@ struct SettingsView: View {
                 }
             }
             Section("settings.updates") {
-                Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
-                Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
+                Toggle("settings.toggle.uncorked.updates", isOn: $uncorkedUpdate)
+                Toggle("settings.toggle.uncorkedwine.updates", isOn: $checkUncorkedWineUpdates)
             }
         }
         .formStyle(.grouped)

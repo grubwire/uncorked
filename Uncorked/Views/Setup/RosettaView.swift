@@ -105,8 +105,8 @@ struct RosettaView: View {
 
     @MainActor
     func proceed() {
-        if !UncorkedWineInstaller.isWhiskyWineInstalled() {
-            path.append(.whiskyWineDownload)
+        if !UncorkedWineInstaller.isUncorkedWineInstalled() {
+            path.append(.uncorkedWineDownload)
             return
         }
 

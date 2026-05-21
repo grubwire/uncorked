@@ -21,12 +21,12 @@ import AppKit
 
 class UncorkedCmd {
     static func install() async {
-        let whiskyCmdURL = Bundle.main.url(forResource: "UncorkedCmd", withExtension: nil)
+        let uncorkedCmdURL = Bundle.main.url(forResource: "UncorkedCmd", withExtension: nil)
 
-        if let whiskyCmdURL = whiskyCmdURL {
+        if let uncorkedCmdURL = uncorkedCmdURL {
             // swiftlint:disable line_length
             let script = """
-            do shell script "ln -fs \(whiskyCmdURL.path(percentEncoded: false)) /usr/local/bin/whisky" with administrator privileges
+            do shell script "ln -fs \(uncorkedCmdURL.path(percentEncoded: false)) /usr/local/bin/uncorked" with administrator privileges
             """
             // swiftlint:enable line_length
 

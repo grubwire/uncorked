@@ -38,7 +38,7 @@ private struct GcenxAsset: Codable {
 }
 
 public class UncorkedWineInstaller {
-    /// The Whisky application folder
+    /// The Uncorked application folder
     public static let applicationFolder = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
         )[0].appending(path: Bundle.uncorkedBundleIdentifier)
@@ -91,8 +91,8 @@ public class UncorkedWineInstaller {
 
     // MARK: - Public API
 
-    public static func isWhiskyWineInstalled() -> Bool {
-        return whiskyWineVersion() != nil
+    public static func isUncorkedWineInstalled() -> Bool {
+        return uncorkedWineVersion() != nil
     }
 
     /// Install Wine from a downloaded tar.xz at `from`.
@@ -137,7 +137,7 @@ public class UncorkedWineInstaller {
 
             try moveWineRoot(wineRoot, tempDir: tempDir, tagName: tagName)
         } catch {
-            print("Failed to install WhiskyWine: \(error)")
+            print("Failed to install UncorkedWine: \(error)")
         }
     }
 
@@ -179,13 +179,13 @@ public class UncorkedWineInstaller {
         do {
             try FileManager.default.removeItem(at: libraryFolder)
         } catch {
-            print("Failed to uninstall WhiskyWine: \(error)")
+            print("Failed to uninstall UncorkedWine: \(error)")
         }
     }
 
     /// Check whether a newer Gcenx Wine build is available.
-    public static func shouldUpdateWhiskyWine() async -> (Bool, SemanticVersion) {
-        let localVersion = whiskyWineVersion()
+    public static func shouldUpdateUncorkedWine() async -> (Bool, SemanticVersion) {
+        let localVersion = uncorkedWineVersion()
         let remoteVersion = await fetchLatestGcenxVersion()
 
         if let localVersion = localVersion, let remoteVersion = remoteVersion {
@@ -197,7 +197,7 @@ public class UncorkedWineInstaller {
         return (false, SemanticVersion(0, 0, 0))
     }
 
-    public static func whiskyWineVersion() -> SemanticVersion? {
+    public static func uncorkedWineVersion() -> SemanticVersion? {
         do {
             let versionPlist = libraryFolder
                 .appending(path: "UncorkedWineVersion")

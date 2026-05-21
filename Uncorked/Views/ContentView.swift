@@ -101,22 +101,22 @@ struct ContentView: View {
                 }
             }
 
-            if !UncorkedWineInstaller.isWhiskyWineInstalled() {
+            if !UncorkedWineInstaller.isUncorkedWineInstalled() {
                 showSetup = true
             }
             let task = Task.detached {
-                return await UncorkedWineInstaller.shouldUpdateWhiskyWine()
+                return await UncorkedWineInstaller.shouldUpdateUncorkedWine()
             }
             let updateInfo = await task.value
             if updateInfo.0 {
                 let alert = NSAlert()
-                alert.messageText = String(localized: "update.whiskywine.title")
-                alert.informativeText = String(format: String(localized: "update.whiskywine.description"),
-                                               String(UncorkedWineInstaller.whiskyWineVersion()
+                alert.messageText = String(localized: "update.uncorkedwine.title")
+                alert.informativeText = String(format: String(localized: "update.uncorkedwine.description"),
+                                               String(UncorkedWineInstaller.uncorkedWineVersion()
                                                       ?? SemanticVersion(0, 0, 0)),
                                                String(updateInfo.1))
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: String(localized: "update.whiskywine.update"))
+                alert.addButton(withTitle: String(localized: "update.uncorkedwine.update"))
                 alert.addButton(withTitle: String(localized: "button.removeAlert.cancel"))
 
                 let response = alert.runModal()

@@ -14694,7 +14694,7 @@
         }
       }
     },
-    "settings.toggle.whisky.updates" : {
+    "settings.toggle.uncorked.updates" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -14830,7 +14830,7 @@
         }
       }
     },
-    "settings.toggle.whiskywine.updates" : {
+    "settings.toggle.uncorkedwine.updates" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17142,7 +17142,7 @@
         }
       }
     },
-    "setup.whiskywine.download" : {
+    "setup.uncorkedwine.download" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17278,7 +17278,7 @@
         }
       }
     },
-    "setup.whiskywine.download.subtitle" : {
+    "setup.uncorkedwine.download.subtitle" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17414,7 +17414,7 @@
         }
       }
     },
-    "setup.whiskywine.eta" : {
+    "setup.uncorkedwine.eta" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17550,7 +17550,7 @@
         }
       }
     },
-    "setup.whiskywine.install" : {
+    "setup.uncorkedwine.install" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17686,7 +17686,7 @@
         }
       }
     },
-    "setup.whiskywine.install.subtitle" : {
+    "setup.uncorkedwine.install.subtitle" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17822,7 +17822,7 @@
         }
       }
     },
-    "setup.whiskywine.progress" : {
+    "setup.uncorkedwine.progress" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18911,7 +18911,7 @@
         }
       }
     },
-    "update.whiskywine.description" : {
+    "update.uncorkedwine.description" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19047,7 +19047,7 @@
         }
       }
     },
-    "update.whiskywine.title" : {
+    "update.uncorkedwine.title" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19183,7 +19183,7 @@
         }
       }
     },
-    "update.whiskywine.update" : {
+    "update.uncorkedwine.update" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {

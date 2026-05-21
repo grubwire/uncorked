@@ -75,7 +75,7 @@ struct ProgramsView: View {
                     }
                 }
             }
-            .animation(.whiskyDefault, value: sortedPrograms)
+            .animation(.uncorkedDefault, value: sortedPrograms)
 
             Section("program.blocklist", isExpanded: $isBlocklistExpanded) {
                 List(searchedBlocklists, id: \.self, selection: $selectedBlockitems) { blockedUrl in
@@ -103,11 +103,11 @@ struct ProgramsView: View {
             }
         }
         .formStyle(.grouped)
-        .animation(.whiskyDefault, value: sortedPrograms)
-        .animation(.whiskyDefault, value: bottle.settings.blocklist)
-        .animation(.whiskyDefault, value: searchText)
-        .animation(.whiskyDefault, value: areProgramsExpanded)
-        .animation(.whiskyDefault, value: isBlocklistExpanded)
+        .animation(.uncorkedDefault, value: sortedPrograms)
+        .animation(.uncorkedDefault, value: bottle.settings.blocklist)
+        .animation(.uncorkedDefault, value: searchText)
+        .animation(.uncorkedDefault, value: areProgramsExpanded)
+        .animation(.uncorkedDefault, value: isBlocklistExpanded)
         .navigationTitle("tab.programs")
         .searchable(text: $searchText)
         .onAppear {

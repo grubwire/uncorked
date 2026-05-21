@@ -29,7 +29,7 @@ class ThumbnailProvider: QLThumbnailProvider {
 
         // % of thumbnail occupied by icon
         let iconScaleFactor = 0.9
-        let whiskyIconScaleFactor = 0.4
+        let appIconScaleFactor = 0.4
 
         // AppKit coordinate system origin is in the bottom-left
         // Icon is centered
@@ -38,11 +38,11 @@ class ThumbnailProvider: QLThumbnailProvider {
                                width: request.maximumSize.width * iconScaleFactor,
                                height: request.maximumSize.height * iconScaleFactor)
 
-        // Whisky icon is aligned bottom-right
-        let whiskyIconFrame = CGRect(x: request.maximumSize.width - request.maximumSize.width * whiskyIconScaleFactor,
+        // App icon is aligned bottom-right
+        let appIconFrame = CGRect(x: request.maximumSize.width - request.maximumSize.width * appIconScaleFactor,
                                      y: 0,
-                                     width: request.maximumSize.width * whiskyIconScaleFactor,
-                                     height: request.maximumSize.height * whiskyIconScaleFactor)
+                                     width: request.maximumSize.width * appIconScaleFactor,
+                                     height: request.maximumSize.height * appIconScaleFactor)
         do {
             var image: NSImage?
 
@@ -52,8 +52,8 @@ class ThumbnailProvider: QLThumbnailProvider {
             let reply: QLThumbnailReply = QLThumbnailReply.init(contextSize: thumbnailSize) { () -> Bool in
                 if let image = image {
                     image.draw(in: iconFrame)
-                    let whiskyIcon = NSImage(named: NSImage.Name("Icon"))
-                    whiskyIcon?.draw(in: whiskyIconFrame, from: .zero, operation: .sourceOver, fraction: 1)
+                    let appIcon = NSImage(named: NSImage.Name("Icon"))
+                    appIcon?.draw(in: appIconFrame, from: .zero, operation: .sourceOver, fraction: 1)
                     return true
                 }
 

@@ -108,8 +108,8 @@ struct ProgramView: View {
         }
         .navigationTitle(program.name)
         .formStyle(.grouped)
-        .animation(.whiskyDefault, value: configSectionExpanded)
-        .animation(.whiskyDefault, value: envArgsSectionExpanded)
+        .animation(.uncorkedDefault, value: configSectionExpanded)
+        .animation(.uncorkedDefault, value: envArgsSectionExpanded)
         .task {
             if let fetchedImage = program.peFile?.bestIcon() { self.cachedIconImage = Image(nsImage: fetchedImage) }
         }

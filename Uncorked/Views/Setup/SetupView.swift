@@ -20,8 +20,8 @@ import SwiftUI
 
 enum SetupStage {
     case rosetta
-    case whiskyWineDownload
-    case whiskyWineInstall
+    case uncorkedWineDownload
+    case uncorkedWineInstall
 }
 
 struct SetupView: View {
@@ -40,11 +40,11 @@ struct SetupView: View {
                         switch stage {
                         case .rosetta:
                             RosettaView(path: $path, showSetup: $showSetup)
-                        case .whiskyWineDownload:
+                        case .uncorkedWineDownload:
                             UncorkedWineDownloadView(tarLocation: $tarLocation,
                                                    wineTagName: $wineTagName,
                                                    path: $path)
-                        case .whiskyWineInstall:
+                        case .uncorkedWineInstall:
                             UncorkedWineInstallView(tarLocation: $tarLocation,
                                                   wineTagName: $wineTagName,
                                                   path: $path,
