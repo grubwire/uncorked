@@ -9417,7 +9417,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Install Whisky CLI..."
+            "value" : "Install Uncorked CLI..."
           }
         },
         "es" : {
@@ -14587,7 +14587,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminate Wine processes when Whisky closes"
+            "value" : "Terminate Wine processes when Uncorked closes"
           }
         },
         "es" : {
@@ -14641,7 +14641,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminate Wine processes when Whisky closes"
+            "value" : "Terminate Wine processes when Uncorked closes"
           }
         },
         "pt-PT" : {
@@ -14723,7 +14723,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatically check for Whisky updates"
+            "value" : "Automatically check for Uncorked updates"
           }
         },
         "es" : {
@@ -14777,7 +14777,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatically check for Whisky updates"
+            "value" : "Automatically check for Uncorked updates"
           }
         },
         "pt-PT" : {
@@ -14859,7 +14859,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatically check for WhiskyWine updates"
+            "value" : "Automatically check for UncorkedWine updates"
           }
         },
         "es" : {
@@ -16491,7 +16491,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Manage Whisky's required dependencies."
+            "value" : "Manage Uncorked's required dependencies."
           }
         },
         "es" : {
@@ -16899,7 +16899,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome to Whisky"
+            "value" : "Welcome to Uncorked"
           }
         },
         "es" : {
@@ -17171,7 +17171,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Downloading WhiskyWine"
+            "value" : "Downloading UncorkedWine"
           }
         },
         "es" : {
@@ -17579,7 +17579,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installing WhiskyWine"
+            "value" : "Installing UncorkedWine"
           }
         },
         "es" : {
@@ -18940,7 +18940,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You are running WhiskyWine %@, but %@ is available. Would you like to update?"
+            "value" : "You are running UncorkedWine %@, but %@ is available. Would you like to update?"
           }
         },
         "es" : {
@@ -19076,7 +19076,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "New Version of WhiskyWine Available"
+            "value" : "New Version of UncorkedWine Available"
           }
         },
         "es" : {

@@ -6,7 +6,7 @@ Uncorked is a maintained fork of [Whisky](https://github.com/Whisky-App/Whisky),
 
 ## Why Uncorked?
 
-- Whisky was archived in April 2025
+- Whisky (the upstream project) was archived in April 2025
 - wine-stable on Homebrew is deprecated (disabled Sept 2026)
 - CrossOver costs $74
 - Uncorked is free, open source, and actively maintained
