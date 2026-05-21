@@ -18,6 +18,7 @@
 
 import SwiftUI
 import Sparkle
+import Combine
 
 struct SparkleView: View {
     @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
@@ -37,9 +38,23 @@ struct SparkleView: View {
 // This view model class publishes when new updates can be checked by the user
 final class CheckForUpdatesViewModel: ObservableObject {
     @Published var canCheckForUpdates = false
+    private var cancellables = Set<AnyCancellable>()
 
     init(updater: SPUUpdater) {
-        updater.publisher(for: \.canCheckForUpdates)
-            .assign(to: &$canCheckForUpdates)
+        // Initialize with the current state on the main thread
+        Task { @MainActor in
+            self.canCheckForUpdates = updater.canCheckForUpdates
+
+            // Observe updates via the SPUUpdater state subject
+            // Fallback to periodic checks if direct binding isn't available
+            Timer.publish(every: 0.5, on: .main, in: .common)
+                .autoconnect()
+                .sink { [weak self] _ in
+                    Task { @MainActor in
+                        self?.canCheckForUpdates = updater.canCheckForUpdates
+                    }
+                }
+                .store(in: &self.cancellables)
+        }
     }
 }
