@@ -20,6 +20,6 @@ import Foundation
 
 public extension Bundle {
     static var whiskyBundleIdentifier: String {
-        return Bundle.main.bundleIdentifier ?? "app.uncork.Uncork"
+        return Bundle.main.bundleIdentifier ?? "app.uncorked.Uncorked"
     }
 }

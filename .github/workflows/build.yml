@@ -12,4 +12,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: xcodebuild build -scheme Uncork -configuration Debug CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild build -scheme Uncorked -configuration Debug CODE_SIGNING_ALLOWED=NO

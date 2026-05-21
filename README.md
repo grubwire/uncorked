@@ -1,21 +1,21 @@
-# Uncork
+# Uncorked
 
 Run Windows apps and games on macOS — no scripts, no Terminal, just download and go.
 
-Uncork is a maintained fork of [Whisky](https://github.com/Whisky-App/Whisky), updated to use [Gcenx's actively maintained Wine builds](https://github.com/Gcenx/macOS_Wine_builds) instead of the original archived source.
+Uncorked is a maintained fork of [Whisky](https://github.com/Whisky-App/Whisky), updated to use [Gcenx's actively maintained Wine builds](https://github.com/Gcenx/macOS_Wine_builds) instead of the original archived source.
 
-## Why Uncork?
+## Why Uncorked?
 
 - Whisky was archived in April 2025
 - wine-stable on Homebrew is deprecated (disabled Sept 2026)
 - CrossOver costs $74
-- Uncork is free, open source, and actively maintained
+- Uncorked is free, open source, and actively maintained
 
 ## Download
 
-[**Download the latest release →**](https://github.com/grubwire/uncork/releases/latest)
+[**Download the latest release →**](https://github.com/grubwire/uncorked/releases/latest)
 
-Double-click the DMG, drag Uncork to Applications. That's it.
+Double-click the DMG, drag Uncorked to Applications. That's it.
 
 ## Requirements
 
@@ -24,14 +24,14 @@ Double-click the DMG, drag Uncork to Applications. That's it.
 
 ## Usage
 
-1. Open Uncork
+1. Open Uncorked
 2. Click **+** to create a new bottle
 3. Click **Install Software** and select your Windows `.exe`
 4. Launch it from the Programs list
 
 ## Support the project
 
-Uncork needs an Apple Developer account ($99/year) to distribute signed, notarized builds.
+Uncorked needs an Apple Developer account ($99/year) to distribute signed, notarized builds.
 
 [**Sponsor on GitHub →**](https://github.com/sponsors/grubwire)
 
