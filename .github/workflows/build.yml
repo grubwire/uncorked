@@ -1,0 +1,15 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: xcodebuild build -scheme Uncork -configuration Debug CODE_SIGNING_ALLOWED=NO
