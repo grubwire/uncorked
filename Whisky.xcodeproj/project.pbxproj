@@ -53,11 +53,11 @@
 		6EFDF6512AAE2DA800EF622F /* ThumbnailProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFDF6502AAE2DA800EF622F /* ThumbnailProvider.swift */; };
 		6EFDF6562AAE2DA800EF622F /* UncorkedThumbnail.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6EFDF64A2AAE2DA800EF622F /* UncorkedThumbnail.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6EFDF6662AAE303300EF622F /* Icons.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6EFDF6652AAE303300EF622F /* Icons.xcassets */; };
-		8C2AEFC82AED79B700CB568F /* WhiskyKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8C2AEFC72AED79B700CB568F /* WhiskyKit */; };
-		8C2AEFCA2AED79CD00CB568F /* WhiskyKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8C2AEFC92AED79CD00CB568F /* WhiskyKit */; };
+		8C2AEFC82AED79B700CB568F /* UncorkedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8C2AEFC72AED79B700CB568F /* UncorkedKit */; };
+		8C2AEFCA2AED79CD00CB568F /* UncorkedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8C2AEFC92AED79CD00CB568F /* UncorkedKit */; };
 		8C73E1342AF472FC00B6FB45 /* ProgramMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C73E1332AF472FC00B6FB45 /* ProgramMenuView.swift */; };
-		8CB681E52AED7C6F0018D319 /* WhiskyKit in Resources */ = {isa = PBXBuildFile; fileRef = 8CB681E42AED7C6F0018D319 /* WhiskyKit */; };
-		8CB681E72AED7CD00018D319 /* WhiskyKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8CB681E62AED7CD00018D319 /* WhiskyKit */; };
+		8CB681E52AED7C6F0018D319 /* UncorkedKit in Resources */ = {isa = PBXBuildFile; fileRef = 8CB681E42AED7C6F0018D319 /* UncorkedKit */; };
+		8CB681E72AED7CD00018D319 /* UncorkedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8CB681E62AED7CD00018D319 /* UncorkedKit */; };
 		AB0BCABD2B61036E00E21C31 /* RunningProcessesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0BCABC2B61036E00E21C31 /* RunningProcessesView.swift */; };
 		DB696FC82AFAE5DA0037EB2F /* PinCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB696FC72AFAE5DA0037EB2F /* PinCreationView.swift */; };
 		EB58FB552A499896002DC184 /* SemanticVersion in Frameworks */ = {isa = PBXBuildFile; productRef = EB58FB542A499896002DC184 /* SemanticVersion */; };
@@ -157,7 +157,7 @@
 		6EFDF6532AAE2DA800EF622F /* UncorkedThumbnail.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = UncorkedThumbnail.entitlements; sourceTree = "<group>"; };
 		6EFDF6652AAE303300EF622F /* Icons.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Icons.xcassets; sourceTree = "<group>"; };
 		8C73E1332AF472FC00B6FB45 /* ProgramMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramMenuView.swift; sourceTree = "<group>"; };
-		8CB681E42AED7C6F0018D319 /* WhiskyKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = WhiskyKit; sourceTree = "<group>"; };
+		8CB681E42AED7C6F0018D319 /* UncorkedKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = UncorkedKit; sourceTree = "<group>"; };
 		AB0BCABC2B61036E00E21C31 /* RunningProcessesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningProcessesView.swift; sourceTree = "<group>"; };
 		DB696FC72AFAE5DA0037EB2F /* PinCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinCreationView.swift; sourceTree = "<group>"; };
 		EEA5A2452A31DD65008274AE /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -168,7 +168,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8C2AEFC82AED79B700CB568F /* WhiskyKit in Frameworks */,
+				8C2AEFC82AED79B700CB568F /* UncorkedKit in Frameworks */,
 				6E064B1229DD32A200D9A2D2 /* Sparkle in Frameworks */,
 				EB58FB552A499896002DC184 /* SemanticVersion in Frameworks */,
 			);
@@ -178,7 +178,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8C2AEFCA2AED79CD00CB568F /* WhiskyKit in Frameworks */,
+				8C2AEFCA2AED79CD00CB568F /* UncorkedKit in Frameworks */,
 				6E95F6732AB3F67200D585D1 /* Progress in Frameworks */,
 				6E5B61B62AC34E6D007B1913 /* SemanticVersion in Frameworks */,
 				6E95F6702AB3F33C00D585D1 /* SwiftyTextTable in Frameworks */,
@@ -190,7 +190,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8CB681E72AED7CD00018D319 /* WhiskyKit in Frameworks */,
+				8CB681E72AED7CD00018D319 /* UncorkedKit in Frameworks */,
 				6EFDF64C2AAE2DA800EF622F /* QuickLookThumbnailing.framework in Frameworks */,
 				6EFDF64E2AAE2DA800EF622F /* Quartz.framework in Frameworks */,
 			);
@@ -267,7 +267,7 @@
 				6E40495429CCA19C006E3F1B /* Whisky */,
 				6E70A4992A9A2197007799E9 /* UncorkedCmd */,
 				6EFDF64F2AAE2DA800EF622F /* UncorkedThumbnail */,
-				8CB681E42AED7C6F0018D319 /* WhiskyKit */,
+				8CB681E42AED7C6F0018D319 /* UncorkedKit */,
 				6E2FB15F2B589A9000E344C6 /* Libraries */,
 				6E40495329CCA19C006E3F1B /* Products */,
 				6E5967692A9A424900D64F70 /* Frameworks */,
@@ -416,7 +416,7 @@
 			packageProductDependencies = (
 				6E064B1129DD32A200D9A2D2 /* Sparkle */,
 				EB58FB542A499896002DC184 /* SemanticVersion */,
-				8C2AEFC72AED79B700CB568F /* WhiskyKit */,
+				8C2AEFC72AED79B700CB568F /* UncorkedKit */,
 			);
 			productName = Whisky;
 			productReference = 6E40495229CCA19C006E3F1B /* Whisky.app */;
@@ -440,7 +440,7 @@
 				6E95F66F2AB3F33C00D585D1 /* SwiftyTextTable */,
 				6E95F6722AB3F67200D585D1 /* Progress */,
 				6E5B61B52AC34E6D007B1913 /* SemanticVersion */,
-				8C2AEFC92AED79CD00CB568F /* WhiskyKit */,
+				8C2AEFC92AED79CD00CB568F /* UncorkedKit */,
 			);
 			productName = UncorkedCmd;
 			productReference = 6E70A4982A9A2197007799E9 /* UncorkedCmd */;
@@ -460,7 +460,7 @@
 			);
 			name = UncorkedThumbnail;
 			packageProductDependencies = (
-				8CB681E62AED7CD00018D319 /* WhiskyKit */,
+				8CB681E62AED7CD00018D319 /* UncorkedKit */,
 			);
 			productName = UncorkedThumbnail;
 			productReference = 6EFDF64A2AAE2DA800EF622F /* UncorkedThumbnail.appex */;
@@ -523,7 +523,7 @@
 				6E5967682A9A421800D64F70 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
 				6E95F66E2AB3F33C00D585D1 /* XCRemoteSwiftPackageReference "SwiftyTextTable" */,
 				6E95F6712AB3F67200D585D1 /* XCRemoteSwiftPackageReference "Progress" */,
-				8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "WhiskyKit" */,
+				8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "UncorkedKit" */,
 			);
 			productRefGroup = 6E40495329CCA19C006E3F1B /* Products */;
 			projectDirPath = "";
@@ -541,7 +541,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8CB681E52AED7C6F0018D319 /* WhiskyKit in Resources */,
+				8CB681E52AED7C6F0018D319 /* UncorkedKit in Resources */,
 				6E40495D29CCA19C006E3F1B /* Preview Assets.xcassets in Resources */,
 				6EB58AC92AEACE5E00B1ED3F /* Localizable.xcstrings in Resources */,
 				6E40495A29CCA19C006E3F1B /* Assets.xcassets in Resources */,
@@ -1014,9 +1014,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "WhiskyKit" */ = {
+		8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "UncorkedKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = WhiskyKit;
+			relativePath = UncorkedKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -1089,18 +1089,18 @@
 			package = 6E95F6712AB3F67200D585D1 /* XCRemoteSwiftPackageReference "Progress" */;
 			productName = Progress;
 		};
-		8C2AEFC72AED79B700CB568F /* WhiskyKit */ = {
+		8C2AEFC72AED79B700CB568F /* UncorkedKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = WhiskyKit;
+			productName = UncorkedKit;
 		};
-		8C2AEFC92AED79CD00CB568F /* WhiskyKit */ = {
+		8C2AEFC92AED79CD00CB568F /* UncorkedKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "WhiskyKit" */;
-			productName = WhiskyKit;
+			package = 8C2AEFC62AED79B700CB568F /* XCLocalSwiftPackageReference "UncorkedKit" */;
+			productName = UncorkedKit;
 		};
-		8CB681E62AED7CD00018D319 /* WhiskyKit */ = {
+		8CB681E62AED7CD00018D319 /* UncorkedKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = WhiskyKit;
+			productName = UncorkedKit;
 		};
 		EB58FB542A499896002DC184 /* SemanticVersion */ = {
 			isa = XCSwiftPackageProductDependency;
