@@ -17,32 +17,7 @@ jobs:
       - name: Install dependencies
         run: brew install swiftlint create-dmg
 
-      - name: Import Developer ID certificate
-        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE != '' }}
-        env:
-          CERT_B64: ${{ secrets.DEVELOPER_ID_CERTIFICATE }}
-          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN="$RUNNER_TEMP/build.keychain"
-          security create-keychain -p "uncorked-ci" "$KEYCHAIN"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p "uncorked-ci" "$KEYCHAIN"
-          echo "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
-          security set-key-partition-list -S apple-tool:,apple: -s -k "uncorked-ci" "$KEYCHAIN"
-          rm "$RUNNER_TEMP/cert.p12"
-
-      - name: Archive (signed)
-        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE != '' }}
-        run: |
-          xcodebuild archive \
-            -scheme Uncorked \
-            -configuration Release \
-            -archivePath "$RUNNER_TEMP/Uncorked.xcarchive"
-
-      - name: Archive (unsigned)
-        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE == '' }}
+      - name: Archive
         run: |
           xcodebuild archive \
             -scheme Uncorked \
@@ -50,35 +25,12 @@ jobs:
             -archivePath "$RUNNER_TEMP/Uncorked.xcarchive" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Export app (signed)
-        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE != '' }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/Uncorked.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist ExportOptions.plist
-
-      - name: Export app (unsigned)
-        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE == '' }}
+      - name: Export app
         run: |
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Uncorked.xcarchive" \
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist ExportOptions-unsigned.plist
-
-      - name: Notarize
-        if: ${{ secrets.APPLE_ID != '' }}
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          xcrun notarytool submit "$RUNNER_TEMP/export/Uncorked.app" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM" \
-            --wait
-          xcrun stapler staple "$RUNNER_TEMP/export/Uncorked.app"
 
       - name: Create DMG
         run: |
