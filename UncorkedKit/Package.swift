@@ -1,7 +1,7 @@
 // swift-tools-version: 5.9
 //
 //  PortableExecutable.swift
-//  WhiskyKit
+//  UncorkedKit
 //
 //  This file is part of Uncorked.
 //
@@ -20,14 +20,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "WhiskyKit",
+    name: "UncorkedKit",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .library(
-            name: "WhiskyKit",
-            targets: ["WhiskyKit"]
+            name: "UncorkedKit",
+            targets: ["UncorkedKit"]
         )
     ],
     dependencies: [
@@ -35,7 +35,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "WhiskyKit",
+            name: "UncorkedKit",
             dependencies: ["SemanticVersion"]
         )
     ],
