@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install swiftlint create-dmg
+
+      - name: Import Developer ID certificate
+        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE != '' }}
+        env:
+          CERT_B64: ${{ secrets.DEVELOPER_ID_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "uncorked-ci" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "uncorked-ci" "$KEYCHAIN"
+          echo "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
+          security set-key-partition-list -S apple-tool:,apple: -s -k "uncorked-ci" "$KEYCHAIN"
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -scheme Uncorked \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/Uncorked.xcarchive" \
+            CODE_SIGNING_ALLOWED=${{ secrets.DEVELOPER_ID_CERTIFICATE != '' && 'YES' || 'NO' }}
+
+      - name: Export app
+        run: |
+          PLIST=${{ secrets.DEVELOPER_ID_CERTIFICATE != '' && 'ExportOptions.plist' || 'ExportOptions-unsigned.plist' }}
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Uncorked.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$PLIST"
+
+      - name: Notarize
+        if: ${{ secrets.APPLE_ID != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "$RUNNER_TEMP/export/Uncorked.app" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM" \
+            --wait
+          xcrun stapler staple "$RUNNER_TEMP/export/Uncorked.app"
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Uncorked" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 128 \
+            --icon "Uncorked.app" 200 185 \
+            --hide-extension "Uncorked.app" \
+            --app-drop-link 460 185 \
+            "$RUNNER_TEMP/Uncorked-${{ github.ref_name }}.dmg" \
+            "$RUNNER_TEMP/export/"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: "${{ runner.temp }}/Uncorked-${{ github.ref_name }}.dmg"
