@@ -41,11 +41,11 @@ struct SetupView: View {
                         case .rosetta:
                             RosettaView(path: $path, showSetup: $showSetup)
                         case .whiskyWineDownload:
-                            WhiskyWineDownloadView(tarLocation: $tarLocation,
+                            UncorkedWineDownloadView(tarLocation: $tarLocation,
                                                    wineTagName: $wineTagName,
                                                    path: $path)
                         case .whiskyWineInstall:
-                            WhiskyWineInstallView(tarLocation: $tarLocation,
+                            UncorkedWineInstallView(tarLocation: $tarLocation,
                                                   wineTagName: $wineTagName,
                                                   path: $path,
                                                   showSetup: $showSetup)

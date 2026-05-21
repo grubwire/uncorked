@@ -21,11 +21,11 @@ import os.log
 
 public class Wine {
     /// URL to the installed `DXVK` folder
-    private static let dxvkFolder: URL = WhiskyWineInstaller.libraryFolder.appending(path: "DXVK")
+    private static let dxvkFolder: URL = UncorkedWineInstaller.libraryFolder.appending(path: "DXVK")
     /// Path to the `wine64` binary
-    public static let wineBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    public static let wineBinary: URL = UncorkedWineInstaller.binFolder.appending(path: "wine64")
     /// Parth to the `wineserver` binary
-    private static let wineserverBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wineserver")
+    private static let wineserverBinary: URL = UncorkedWineInstaller.binFolder.appending(path: "wineserver")
 
     /// Run a process on a executable file given by the `executableURL`
     private static func runProcess(
@@ -125,7 +125,7 @@ public class Wine {
 
     public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
         var cmd = """
-        export PATH=\"\(WhiskyWineInstaller.binFolder.path):$PATH\"
+        export PATH=\"\(UncorkedWineInstaller.binFolder.path):$PATH\"
         export WINE=\"wine64\"
         alias wine=\"wine64\"
         alias winecfg=\"wine64 winecfg\"
@@ -269,7 +269,7 @@ enum RegistryType: String {
 extension Wine {
     public static let logsFolder = FileManager.default.urls(
         for: .libraryDirectory, in: .userDomainMask
-    )[0].appending(path: "Logs").appending(path: Bundle.whiskyBundleIdentifier)
+    )[0].appending(path: "Logs").appending(path: Bundle.uncorkedBundleIdentifier)
 
     public static func makeFileHandle() throws -> FileHandle {
         if !FileManager.default.fileExists(atPath: Self.logsFolder.path) {

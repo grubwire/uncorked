@@ -1,5 +1,5 @@
 //
-//  WhiskyCmd.swift
+//  UncorkedCmd.swift
 //  Whisky
 //
 //  This file is part of Uncorked.
@@ -19,9 +19,9 @@
 import Foundation
 import AppKit
 
-class WhiskyCmd {
+class UncorkedCmd {
     static func install() async {
-        let whiskyCmdURL = Bundle.main.url(forResource: "WhiskyCmd", withExtension: nil)
+        let whiskyCmdURL = Bundle.main.url(forResource: "UncorkedCmd", withExtension: nil)
 
         if let whiskyCmdURL = whiskyCmdURL {
             // swiftlint:disable line_length

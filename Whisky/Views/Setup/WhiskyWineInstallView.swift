@@ -1,5 +1,5 @@
 //
-//  WhiskyWineInstallView.swift
+//  UncorkedWineInstallView.swift
 //  Whisky
 //
 //  This file is part of Uncorked.
@@ -19,7 +19,7 @@
 import SwiftUI
 import WhiskyKit
 
-struct WhiskyWineInstallView: View {
+struct UncorkedWineInstallView: View {
     @State var installing: Bool = true
     @Binding var tarLocation: URL
     @Binding var wineTagName: String
@@ -55,7 +55,7 @@ struct WhiskyWineInstallView: View {
             Task.detached {
                 let tag = await MainActor.run { wineTagName }
                 let loc = await MainActor.run { tarLocation }
-                await WhiskyWineInstaller.install(from: loc, tagName: tag.isEmpty ? nil : tag)
+                await UncorkedWineInstaller.install(from: loc, tagName: tag.isEmpty ? nil : tag)
                 await MainActor.run {
                     installing = false
                 }

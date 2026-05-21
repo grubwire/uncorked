@@ -1,5 +1,5 @@
 //
-//  WhiskyWineInstaller.swift
+//  UncorkedWineInstaller.swift
 //  WhiskyKit
 //
 //  This file is part of Uncorked.
@@ -37,11 +37,11 @@ private struct GcenxAsset: Codable {
     }
 }
 
-public class WhiskyWineInstaller {
+public class UncorkedWineInstaller {
     /// The Whisky application folder
     public static let applicationFolder = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
-        )[0].appending(path: Bundle.whiskyBundleIdentifier)
+        )[0].appending(path: Bundle.uncorkedBundleIdentifier)
 
     /// The folder of all the library files
     public static let libraryFolder = applicationFolder.appending(path: "Libraries")
@@ -128,7 +128,7 @@ public class WhiskyWineInstaller {
             }) else {
                 // Fallback: just use first directory
                 guard let first = extracted.first else {
-                    print("WhiskyWineInstaller: no extracted directory found")
+                    print("UncorkedWineInstaller: no extracted directory found")
                     return
                 }
                 try moveWineRoot(first, tempDir: tempDir, tagName: tagName)
@@ -154,7 +154,7 @@ public class WhiskyWineInstaller {
         // Clean up temp dir
         try? FileManager.default.removeItem(at: tempDir)
 
-        // Write a synthetic WhiskyWineVersion.plist
+        // Write a synthetic UncorkedWineVersion.plist
         let version: SemanticVersion
         if let tag = tagName, let parsed = parseGcenxTag(tag) {
             version = parsed
@@ -166,9 +166,9 @@ public class WhiskyWineInstaller {
 
     private static func writeVersionPlist(_ version: SemanticVersion) throws {
         let versionPlist = libraryFolder
-            .appending(path: "WhiskyWineVersion")
+            .appending(path: "UncorkedWineVersion")
             .appendingPathExtension("plist")
-        let info = WhiskyWineVersion(version: version)
+        let info = UncorkedWineVersion(version: version)
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .xml
         let data = try encoder.encode(info)
@@ -200,12 +200,12 @@ public class WhiskyWineInstaller {
     public static func whiskyWineVersion() -> SemanticVersion? {
         do {
             let versionPlist = libraryFolder
-                .appending(path: "WhiskyWineVersion")
+                .appending(path: "UncorkedWineVersion")
                 .appendingPathExtension("plist")
 
             let decoder = PropertyListDecoder()
             let data = try Data(contentsOf: versionPlist)
-            let info = try decoder.decode(WhiskyWineVersion.self, from: data)
+            let info = try decoder.decode(UncorkedWineVersion.self, from: data)
             return info.version
         } catch {
             print(error)
@@ -214,6 +214,6 @@ public class WhiskyWineInstaller {
     }
 }
 
-struct WhiskyWineVersion: Codable {
+struct UncorkedWineVersion: Codable {
     var version: SemanticVersion = SemanticVersion(1, 0, 0)
 }

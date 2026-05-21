@@ -1,5 +1,5 @@
 //
-//  WhiskyApp.swift
+//  UncorkedApp.swift
 //  Whisky
 //
 //  This file is part of Uncorked.
@@ -21,7 +21,7 @@ import Sparkle
 import WhiskyKit
 
 @main
-struct WhiskyApp: App {
+struct UncorkedApp: App {
     @State var showSetup: Bool = false
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openURL) var openURL
@@ -42,7 +42,7 @@ struct WhiskyApp: App {
                     NSWindow.allowsAutomaticWindowTabbing = false
 
                     Task.detached {
-                        await WhiskyApp.deleteOldLogs()
+                        await UncorkedApp.deleteOldLogs()
                     }
                 }
         }
@@ -59,7 +59,7 @@ struct WhiskyApp: App {
                 }
                 Button("install.cli") {
                     Task {
-                        await WhiskyCmd.install()
+                        await UncorkedCmd.install()
                     }
                 }
             }
@@ -84,16 +84,16 @@ struct WhiskyApp: App {
             }
             CommandGroup(after: .importExport) {
                 Button("open.logs") {
-                    WhiskyApp.openLogsFolder()
+                    UncorkedApp.openLogsFolder()
                 }
                 .keyboardShortcut("L", modifiers: [.command])
                 Button("kill.bottles") {
-                    WhiskyApp.killBottles()
+                    UncorkedApp.killBottles()
                 }
                 .keyboardShortcut("K", modifiers: [.command, .shift])
                 Button("wine.clearShaderCaches") {
-                    WhiskyApp.killBottles() // Better not make things more complicated for ourselves
-                    WhiskyApp.wipeShaderCaches()
+                    UncorkedApp.killBottles() // Better not make things more complicated for ourselves
+                    UncorkedApp.wipeShaderCaches()
                 }
             }
             CommandGroup(replacing: .help) {

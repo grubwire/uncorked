@@ -1,5 +1,5 @@
 //
-//  WhiskyWineDownloadView.swift
+//  UncorkedWineDownloadView.swift
 //  Whisky
 //
 //  This file is part of Uncorked.
@@ -74,7 +74,7 @@ func fetchLatestWineDownloadURL() async throws -> (URL, String) {
 
 // MARK: - Download view
 
-struct WhiskyWineDownloadView: View {
+struct UncorkedWineDownloadView: View {
     @State private var fractionProgress: Double = 0
     @State private var completedBytes: Int64 = 0
     @State private var totalBytes: Int64 = 0

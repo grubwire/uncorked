@@ -1,6 +1,6 @@
 //
 //  Main.swift
-//  WhiskyCmd
+//  UncorkedCmd
 //
 //  This file is part of Uncorked.
 //
@@ -24,7 +24,7 @@ import SemanticVersion
 import ArgumentParser
 
 @main
-struct Whisky: ParsableCommand {
+struct Uncorked: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "A CLI interface for Whisky.",
         subcommands: [List.self,
@@ -39,7 +39,7 @@ struct Whisky: ParsableCommand {
                       Uninstall.self*/])
 }
 
-extension Whisky {
+extension Uncorked {
     struct List: ParsableCommand {
         static let configuration = CommandConfiguration(abstract: "List existing bottles.")
 
