@@ -1,5 +1,11 @@
 name: Release
 
+# Builds, signs (ad-hoc Phase 1), and publishes the Uncorked app.
+# The compatibility engine is separately published to data.grubwire.io
+# via engine-bundle.yml; it is not bundled here.
+#
+# Phase 2: set IDENTITY env and add notarize/staple steps.
+
 on:
   push:
     tags:
@@ -16,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install swiftlint create-dmg
+        run: brew install create-dmg
 
       - name: Archive
         run: |
@@ -33,17 +39,15 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist ExportOptions-unsigned.plist
 
-      - name: Ad-hoc sign
+      - name: Ad-hoc sign (Phase 1)
         run: |
           APP="$RUNNER_TEMP/export/Uncorked.app"
-          # Sign nested bundles (frameworks, dylibs, app extensions) inside-out first.
-          # No --options runtime: hardened runtime requires a real Developer ID cert;
-          # using it with ad-hoc (-) produces an invalid signature that macOS flags as
-          # "damaged" rather than the bypassable "unidentified developer" warning.
+          # Sign nested bundles inside-out first.
+          # No --options runtime: requires a real Developer ID cert; using it
+          # with ad-hoc (-) produces a "damaged" signature on Gatekeeper.
           find "$APP" \( -name "*.framework" -o -name "*.dylib" -o -name "*.appex" \) \
             | sort -r \
             | xargs -I{} codesign --force --sign - "{}"
-          # Sign the outer app bundle last
           codesign --force --sign - "$APP"
 
       - name: Create DMG
@@ -58,8 +62,7 @@ jobs:
             --app-drop-link 460 185 \
             "$RUNNER_TEMP/Uncorked-${{ github.ref_name }}.dmg" \
             "$RUNNER_TEMP/export/"
-          # Stable filename copy: lets grubwire.io link directly to the latest
-          # via https://github.com/grubwire/uncorked/releases/latest/download/Uncorked.dmg
+          # Stable filename for the grubwire.io download link
           cp "$RUNNER_TEMP/Uncorked-${{ github.ref_name }}.dmg" "$RUNNER_TEMP/Uncorked.dmg"
 
       - name: Create GitHub release
