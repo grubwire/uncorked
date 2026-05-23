@@ -1,0 +1,70 @@
+name: Check for engine updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # every Monday 9am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read published engine version
+        id: current
+        run: |
+          VERSION=$(cat engine-version.txt 2>/dev/null | tr -d '[:space:]')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Fetch latest Gcenx release
+        id: gcenx
+        run: |
+          RESPONSE=$(curl -s -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/Gcenx/macOS_Wine_builds/releases/latest)
+          TAG=$(echo "$RESPONSE" | jq -r '.tag_name')
+          URL=$(echo "$RESPONSE" | jq -r '.html_url')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+
+      - name: Check for existing open issue
+        if: steps.current.outputs.version != steps.gcenx.outputs.tag
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COUNT=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --search "Engine ${{ steps.gcenx.outputs.tag }} in:title" \
+            --json number \
+            --jq 'length')
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+
+      - name: Open issue for new release
+        if: |
+          steps.current.outputs.version != steps.gcenx.outputs.tag &&
+          steps.existing.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Engine ${{ steps.gcenx.outputs.tag }} available" \
+            --body "New Gcenx Wine build: **${{ steps.gcenx.outputs.tag }}**
+
+          Release: ${{ steps.gcenx.outputs.url }}
+
+          To publish: run the **Bundle and publish engine** workflow in the Actions tab.
+
+          Test checklist:
+          - [ ] Fresh install: setup flow downloads and installs engine cleanly
+          - [ ] Create a test bottle and run a known-working .exe
+          - [ ] DXVK loads correctly
+          - [ ] Engine update flow: uninstall engine, relaunch, update offered and installs
+          - [ ] Ship a release when everything looks good"
