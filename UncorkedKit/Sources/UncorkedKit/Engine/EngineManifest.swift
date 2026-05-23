@@ -1,0 +1,117 @@
+//
+//  EngineManifest.swift
+//  UncorkedKit
+//
+//  This file is part of Uncorked.
+//
+//  Uncorked is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Uncorked is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Uncorked.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
+import CryptoKit
+import Foundation
+
+// MARK: - Manifest model
+
+/// Describes a signed engine release fetched from data.grubwire.io.
+public struct EngineManifest: Codable {
+    /// Upstream engine tag (e.g. "11.9"). Never shown to users.
+    public let version: String
+    /// Direct download URL for the .tar.xz archive.
+    public let url: String
+    /// Lowercase hex SHA-256 of the archive (verified before extraction).
+    public let sha256: String
+}
+
+// MARK: - Errors
+
+public enum EngineManifestError: Error {
+    case invalidSignature
+    case sha256Mismatch
+}
+
+// MARK: - Manifest client
+
+public enum EngineManifestClient {
+    // Ed25519 public key (32 raw bytes, hex).
+    // The corresponding private key (ENGINE_MANIFEST_SIGNING_KEY CI secret) signs
+    // manifests at release time. Run `scripts/sign-manifest.sh` to produce a .sig file.
+    // Key generated 2026-05-23. Replace both key and CI secret together if rotating.
+    private static let publicKeyHex =
+        "7b2e1e184049bb265afcd68c93d48116ebf952de980f280fc1a930c358aa8742"
+
+    private static var manifestURL: URL {
+        #if DEBUG
+        return URL(string: "https://data.grubwire.io/engine/staging/manifest.json")!
+        #else
+        return URL(string: "https://data.grubwire.io/engine/manifest.json")!
+        #endif
+    }
+
+    private static var signatureURL: URL {
+        #if DEBUG
+        return URL(string: "https://data.grubwire.io/engine/staging/manifest.json.sig")!
+        #else
+        return URL(string: "https://data.grubwire.io/engine/manifest.json.sig")!
+        #endif
+    }
+
+    /// Fetches, signature-verifies, and decodes the engine manifest.
+    public static func fetch() async throws -> EngineManifest {
+        let keyData = Data(hexString: publicKeyHex)
+        let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: keyData)
+
+        let (manifestData, _) = try await URLSession.shared.data(from: manifestURL)
+        let (sigData, _) = try await URLSession.shared.data(from: signatureURL)
+
+        guard publicKey.isValidSignature(sigData, for: manifestData) else {
+            throw EngineManifestError.invalidSignature
+        }
+
+        return try JSONDecoder().decode(EngineManifest.self, from: manifestData)
+    }
+
+    /// Streams the archive at `url` and verifies its SHA-256 matches the manifest.
+    /// Throws `EngineManifestError.sha256Mismatch` if verification fails.
+    public static func verifyArchive(at url: URL, against manifest: EngineManifest) throws {
+        var hasher = SHA256()
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let chunkSize = 1024 * 1024
+        while true {
+            let chunk = try handle.read(upToCount: chunkSize)
+            guard !chunk.isEmpty else { break }
+            hasher.update(data: chunk)
+        }
+        let digest = hasher.finalize()
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        guard hex == manifest.sha256 else {
+            throw EngineManifestError.sha256Mismatch
+        }
+    }
+}
+
+// MARK: - Hex decoding
+
+private extension Data {
+    init(hexString: String) {
+        var data = Data(capacity: hexString.count / 2)
+        var index = hexString.startIndex
+        while index < hexString.endIndex {
+            let next = hexString.index(index, offsetBy: 2)
+            if let byte = UInt8(hexString[index..<next], radix: 16) {
+                data.append(byte)
+            }
+            index = next
+        }
+        self = data
+    }
+}
