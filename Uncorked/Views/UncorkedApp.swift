@@ -44,6 +44,9 @@ struct UncorkedApp: App {
                     Task.detached {
                         await UncorkedApp.deleteOldLogs()
                     }
+                    Task.detached {
+                        UncorkedEngine.removeLegacyEngineIfNeeded()
+                    }
                 }
         }
         // Don't ask me how this works, it just does

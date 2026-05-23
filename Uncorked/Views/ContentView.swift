@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var openedFileURL: URL?
     @State private var triggerRefresh: Bool = false
     @State private var refreshAnimation: Angle = .degrees(0)
+    @State private var setupStartingStage: SetupStage?
 
     @State private var bottleFilter = ""
 
@@ -75,8 +76,8 @@ struct ContentView: View {
         .sheet(isPresented: $showBottleCreation) {
             BottleCreationView(newlyCreatedBottleURL: $newlyCreatedBottleURL)
         }
-        .sheet(isPresented: $showSetup) {
-            SetupView(showSetup: $showSetup, firstTime: false)
+        .sheet(isPresented: $showSetup, onDismiss: { setupStartingStage = nil }) {
+            SetupView(startingStage: setupStartingStage, showSetup: $showSetup, firstTime: false)
         }
         .sheet(item: $openedFileURL) { url in
             FileOpenView(fileURL: url,
@@ -103,12 +104,12 @@ struct ContentView: View {
             }
 
             if !UncorkedEngine.isEnginePresent() {
+                setupStartingStage = nil
                 showSetup = true
+                return
             }
-            let task = Task.detached {
-                return await UncorkedEngine.shouldUpdateEngine()
-            }
-            let updateInfo = await task.value
+
+            let updateInfo = await UncorkedEngine.shouldUpdateEngine()
             if checkEngineUpdates && updateInfo.0 {
                 let alert = NSAlert()
                 alert.messageText = String(localized: "update.engine.title")
@@ -120,10 +121,9 @@ struct ContentView: View {
                 alert.addButton(withTitle: String(localized: "update.engine.update"))
                 alert.addButton(withTitle: String(localized: "button.removeAlert.cancel"))
 
-                let response = alert.runModal()
-
-                if response == .alertFirstButtonReturn {
+                if alert.runModal() == .alertFirstButtonReturn {
                     UncorkedEngine.uninstall()
+                    setupStartingStage = .engineSetup
                     showSetup = true
                 }
             }

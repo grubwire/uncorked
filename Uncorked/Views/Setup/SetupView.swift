@@ -24,9 +24,15 @@ enum SetupStage {
 }
 
 struct SetupView: View {
-    @State private var path: [SetupStage] = []
+    @State private var path: [SetupStage]
     @Binding var showSetup: Bool
-    var firstTime: Bool = true
+    var firstTime: Bool
+
+    init(startingStage: SetupStage? = nil, showSetup: Binding<Bool>, firstTime: Bool = true) {
+        self._path = State(initialValue: startingStage.map { [$0] } ?? [])
+        self._showSetup = showSetup
+        self.firstTime = firstTime
+    }
 
     var body: some View {
         VStack {
