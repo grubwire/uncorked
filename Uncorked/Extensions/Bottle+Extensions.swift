@@ -27,10 +27,10 @@ extension Bottle {
     }
 
     func openTerminal() {
-        let CrosswireCmdURL = Bundle.main.url(forResource: "CrosswireCmd", withExtension: nil)
-        if let CrosswireCmdURL = CrosswireCmdURL {
-            let CrosswireCmd = CrosswireCmdURL.path(percentEncoded: false)
-            let cmd = "eval \\\"$(\\\"\(CrosswireCmd)\\\" shellenv \\\"\(settings.name)\\\")\\\""
+        let crosswireCmdURL = Bundle.main.url(forResource: "CrosswireCmd", withExtension: nil)
+        if let crosswireCmdURL = crosswireCmdURL {
+            let crosswireCmd = crosswireCmdURL.path(percentEncoded: false)
+            let cmd = "eval \\\"$(\\\"\(crosswireCmd)\\\" shellenv \\\"\(settings.name)\\\")\\\""
 
             let script = """
             tell application "Terminal"

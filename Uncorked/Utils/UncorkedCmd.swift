@@ -21,12 +21,12 @@ import AppKit
 
 class CrosswireCmd {
     static func install() async {
-        let CrosswireCmdURL = Bundle.main.url(forResource: "CrosswireCmd", withExtension: nil)
+        let crosswireCmdURL = Bundle.main.url(forResource: "CrosswireCmd", withExtension: nil)
 
-        if let CrosswireCmdURL = CrosswireCmdURL {
+        if let crosswireCmdURL = crosswireCmdURL {
             // swiftlint:disable line_length
             let script = """
-            do shell script "ln -fs \(CrosswireCmdURL.path(percentEncoded: false)) /usr/local/bin/Crosswire" with administrator privileges
+            do shell script "ln -fs \(crosswireCmdURL.path(percentEncoded: false)) /usr/local/bin/Crosswire" with administrator privileges
             """
             // swiftlint:enable line_length
 

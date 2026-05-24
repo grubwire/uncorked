@@ -37,8 +37,9 @@ extension URL {
 
     public func prettyPath() -> String {
         var prettyPath = path(percentEncoded: false)
+        let bundleID = Bundle.main.bundleIdentifier ?? Bundle.CrosswireBundleIdentifier
         prettyPath = prettyPath
-            .replacingOccurrences(of: Bundle.main.bundleIdentifier ?? Bundle.CrosswireBundleIdentifier, with: "Crosswire")
+            .replacingOccurrences(of: bundleID, with: "Crosswire")
             .replacingOccurrences(of: "/Users/\(NSUserName())", with: "~")
         return prettyPath
     }

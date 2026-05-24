@@ -20,7 +20,7 @@ import SwiftUI
 import CrosswireKit
 
 struct SettingsView: View {
-    @AppStorage("SUEnableAutomaticChecks") var CrosswireUpdate = true
+    @AppStorage("SUEnableAutomaticChecks") var crosswireUpdate = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
@@ -48,7 +48,7 @@ struct SettingsView: View {
                 }
             }
             Section("settings.updates") {
-                Toggle("settings.toggle.Crosswire.updates", isOn: $CrosswireUpdate)
+                Toggle("settings.toggle.Crosswire.updates", isOn: $crosswireUpdate)
                 Toggle("settings.toggle.engine.updates", isOn: $checkEngineUpdates)
             }
         }
