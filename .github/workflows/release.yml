@@ -65,6 +65,27 @@ jobs:
           # Stable filename for the grubwire.io download link
           cp "$RUNNER_TEMP/Crosswire-${{ github.ref_name }}.dmg" "$RUNNER_TEMP/Crosswire.dmg"
 
+      - name: Upload DMG to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          pip3 install awscli --break-system-packages --quiet
+          # Versioned copy (immutable)
+          aws s3 cp "$RUNNER_TEMP/Crosswire-${{ github.ref_name }}.dmg" \
+            "s3://${R2_BUCKET}/app/Crosswire-${{ github.ref_name }}.dmg" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type "application/x-apple-diskimage"
+          # Stable pointer — always the latest (grubwire.io/download/crosswire proxies this)
+          aws s3 cp "$RUNNER_TEMP/Crosswire.dmg" \
+            "s3://${R2_BUCKET}/app/Crosswire.dmg" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type "application/x-apple-diskimage" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3.0.0
         with:
