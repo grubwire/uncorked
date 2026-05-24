@@ -61,18 +61,14 @@ public enum EngineManifestClient {
     // DEBUG builds read the staging copy to keep test traffic off the prod manifest.
     #if DEBUG
     // swiftlint:disable:next force_unwrapping
-    private static let engineManifestURL =
-        URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json")!
+    private static let engineManifestURL = URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json")!
     // swiftlint:disable:next force_unwrapping
-    private static let engineManifestSigURL =
-        URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json.sig")!
+    private static let engineManifestSigURL = URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json.sig")!
     #else
     // swiftlint:disable:next force_unwrapping
-    private static let engineManifestURL =
-        URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json")!
+    private static let engineManifestURL = URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json")!
     // swiftlint:disable:next force_unwrapping
-    private static let engineManifestSigURL =
-        URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json.sig")!
+    private static let engineManifestSigURL = URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json.sig")!
     #endif
 
     /// Fetches, signature-verifies, and decodes the engine manifest.
