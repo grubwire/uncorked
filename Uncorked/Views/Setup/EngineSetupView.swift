@@ -54,7 +54,7 @@ struct EngineSetupView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                         Button("setup.retry") {
-                            errorMessage = nil
+                            self.errorMessage = nil
                             startSetup()
                         }
                     }
