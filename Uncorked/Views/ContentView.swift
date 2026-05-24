@@ -76,9 +76,9 @@ struct ContentView: View {
         .sheet(isPresented: $showBottleCreation) {
             BottleCreationView(newlyCreatedBottleURL: $newlyCreatedBottleURL)
         }
-        .sheet(isPresented: $showSetup, onDismiss: { setupStartingStage = nil }) {
+        .sheet(isPresented: $showSetup, onDismiss: { setupStartingStage = nil }, content: {
             SetupView(startingStage: setupStartingStage, showSetup: $showSetup, firstTime: false)
-        }
+        })
         .sheet(item: $openedFileURL) { url in
             FileOpenView(fileURL: url,
                          currentBottle: selected,
