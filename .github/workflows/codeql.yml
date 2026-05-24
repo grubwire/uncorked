@@ -25,6 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
