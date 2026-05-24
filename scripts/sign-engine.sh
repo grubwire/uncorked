@@ -12,7 +12,7 @@
 #   IDENTITY="Developer ID Application: NAME (TEAMID)"
 #   RUNTIME="--options runtime --timestamp"
 #   ENTITLEMENTS="scripts/engine.entitlements"
-set -euo pipefail
+set -eo pipefail
 
 ENGINE="$1"
 IDENTITY="${IDENTITY:--}"
