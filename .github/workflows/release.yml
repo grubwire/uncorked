@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install dependencies
-        run: brew install create-dmg
+        run: brew install create-dmg swiftlint
 
       - name: Archive
         run: |
