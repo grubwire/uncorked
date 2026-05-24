@@ -23,10 +23,10 @@ import os.log
 public class Wine {
     /// URL to the installed `DXVK` folder
     private nonisolated static let dxvkFolder: URL = UncorkedEngine.libraryFolder.appending(path: "DXVK")
-    /// Path to the `wine64` binary
-    public nonisolated static let wineBinary: URL = UncorkedEngine.binFolder.appending(path: "wine64")
-    /// Parth to the `wineserver` binary
-    private nonisolated static let wineserverBinary: URL = UncorkedEngine.binFolder.appending(path: "wineserver")
+    /// Path to the uncorked64 wrapper (thin shell over wine64; all app code uses this, never wine64 directly)
+    public nonisolated static let wineBinary: URL = UncorkedEngine.binFolder.appending(path: "uncorked64")
+    /// Path to the uncorkedserver wrapper (thin shell over wineserver)
+    private nonisolated static let wineserverBinary: URL = UncorkedEngine.binFolder.appending(path: "uncorkedserver")
 
     /// Run a process on a executable file given by the `executableURL`
     private static func runProcess(

@@ -23,12 +23,20 @@ import Foundation
 
 /// Describes a signed engine release fetched from data.grubwire.io.
 public struct EngineManifest: Codable {
-    /// Upstream engine tag (e.g. "11.9"). Never shown to users.
-    public let version: String
+    /// Manifest schema version. Currently 1.
+    public let schemaVersion: Int
+    /// Uncorked engine version string used for update comparison (e.g. "11.9").
+    public let engineVersion: String
+    /// Upstream Gcenx release tag (e.g. "11.9"). Never shown to users.
+    public let upstreamTag: String
     /// Direct download URL for the .tar.xz archive.
     public let url: String
     /// Lowercase hex SHA-256 of the archive (verified before extraction).
     public let sha256: String
+    /// Uncompressed engine size in bytes. Used for disk space pre-check before extraction.
+    public let sizeBytes: Int64
+    /// Minimum app version that can use this engine. App aborts setup if its version is older.
+    public let minAppVersion: String
 }
 
 // MARK: - Errors
@@ -48,29 +56,28 @@ public enum EngineManifestClient {
     private static let publicKeyHex =
         "7b2e1e184049bb265afcd68c93d48116ebf952de980f280fc1a930c358aa8742"
 
-    private static var manifestURL: URL {
-        #if DEBUG
-        return URL(string: "https://data.grubwire.io/engine/staging/manifest.json")!
-        #else
-        return URL(string: "https://data.grubwire.io/engine/manifest.json")!
-        #endif
-    }
-
-    private static var signatureURL: URL {
-        #if DEBUG
-        return URL(string: "https://data.grubwire.io/engine/staging/manifest.json.sig")!
-        #else
-        return URL(string: "https://data.grubwire.io/engine/manifest.json.sig")!
-        #endif
-    }
+    // MARK: - Manifest URL (single isolated config value)
+    // Stage 1: always prod. Switch to beta channel URL when the beta system is built (Part 2).
+    // DEBUG builds read the staging copy to keep test traffic off the prod manifest.
+    #if DEBUG
+    private static let engineManifestURL =
+        URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json")!
+    private static let engineManifestSigURL =
+        URL(string: "https://data.grubwire.io/engine/staging/engine-manifest.json.sig")!
+    #else
+    private static let engineManifestURL =
+        URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json")!
+    private static let engineManifestSigURL =
+        URL(string: "https://data.grubwire.io/engine/prod/engine-manifest.json.sig")!
+    #endif
 
     /// Fetches, signature-verifies, and decodes the engine manifest.
     public static func fetch() async throws -> EngineManifest {
         let keyData = Data(hexString: publicKeyHex)
         let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: keyData)
 
-        let (manifestData, _) = try await URLSession.shared.data(from: manifestURL)
-        let (sigData, _) = try await URLSession.shared.data(from: signatureURL)
+        let (manifestData, _) = try await URLSession.shared.data(from: engineManifestURL)
+        let (sigData, _) = try await URLSession.shared.data(from: engineManifestSigURL)
 
         guard publicKey.isValidSignature(sigData, for: manifestData) else {
             throw EngineManifestError.invalidSignature

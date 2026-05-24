@@ -1,0 +1,95 @@
+name: Promote engine to prod
+
+# Manual promotion of a validated engine artifact to the prod channel on data.grubwire.io.
+# Run this only after verifying the engine artifact produced by engine-bundle.yml.
+#
+# What this does:
+#   1. Downloads the named artifact from the engine-bundle.yml run.
+#   2. Uploads the archive to engine/prod/archives/ on R2 (immutable, version-specific path).
+#   3. Uploads the manifest and signature to engine/prod/ (mutable, always the latest).
+#   4. Updates engine-version.txt in the repo to record the promoted version.
+#
+# Requires secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+# The archive upload happens before the manifest upload, so the manifest never points
+# at an object that does not yet exist.
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine_tag:
+        description: 'Gcenx release tag to promote (e.g. 11.9)'
+        required: true
+        type: string
+      run_id:
+        description: 'engine-bundle.yml workflow run ID containing the artifact'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download engine artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: engine-${{ inputs.engine_tag }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/artifact
+
+      - name: List artifact contents
+        run: ls -lh /tmp/artifact/
+
+      - name: Verify artifact files present
+        run: |
+          TAG="${{ inputs.engine_tag }}"
+          test -f "/tmp/artifact/uncorked-engine-${TAG}.tar.xz" || { echo "Missing archive"; exit 1; }
+          test -f "/tmp/artifact/engine-manifest.json" || { echo "Missing manifest"; exit 1; }
+          test -f "/tmp/artifact/engine-manifest.json.sig" || { echo "Missing signature"; exit 1; }
+
+      - name: Install AWS CLI
+        run: pip install awscli --quiet
+
+      - name: Upload archive to R2 (immutable version-specific path)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          TAG="${{ inputs.engine_tag }}"
+          aws s3 cp "/tmp/artifact/uncorked-engine-${TAG}.tar.xz" \
+            "s3://${R2_BUCKET}/engine/prod/archives/uncorked-engine-${TAG}.tar.xz" \
+            --endpoint-url "$R2_ENDPOINT"
+
+      - name: Upload manifest and signature to R2 (mutable prod pointer)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          aws s3 cp /tmp/artifact/engine-manifest.json \
+            "s3://${R2_BUCKET}/engine/prod/engine-manifest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type "application/json"
+          aws s3 cp /tmp/artifact/engine-manifest.json.sig \
+            "s3://${R2_BUCKET}/engine/prod/engine-manifest.json.sig" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type "application/octet-stream"
+
+      - name: Update engine-version.txt and push
+        run: |
+          echo "${{ inputs.engine_tag }}" > engine-version.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add engine-version.txt
+          git commit -m "Promote engine ${{ inputs.engine_tag }} to prod"
+          git push

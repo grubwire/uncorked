@@ -1,16 +1,18 @@
-name: Bundle and publish engine
+name: Bundle engine
 
 # Triggered manually after reviewing a new Gcenx release (see engine-update-check.yml).
-# Requires secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET,
-#                   ENGINE_MANIFEST_SIGNING_KEY (hex Ed25519 seed)
+# Builds, signs (ad-hoc Phase 1), smoke-tests, generates the signed manifest, and
+# produces a GitHub Actions artifact. It does NOT publish to R2.
+# To publish a validated artifact to data.grubwire.io, run engine-promote-prod.yml.
 #
+# Requires secret: ENGINE_MANIFEST_SIGNING_KEY (hex Ed25519 seed)
 # Phase 2: set IDENTITY, RUNTIME, ENTITLEMENTS for Developer ID signing.
 
 on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Re-publish even if version already matches'
+        description: 'Re-bundle even if version already matches engine-version.txt'
         type: boolean
         default: false
 
@@ -42,20 +44,21 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/Gcenx/macOS_Wine_builds/releases/latest)
           TAG=$(echo "$RESPONSE" | jq -r '.tag_name')
-          # Asset priority: wine-staging > wine-devel > any .tar.xz
+          # Asset priority: wine-stable > wine-staging > wine-devel > any .tar.xz
+          STABLE=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz")) | select(.name | contains("wine-stable"))] | .[0].browser_download_url // empty')
           STAGING=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz")) | select(.name | contains("wine-staging"))] | .[0].browser_download_url // empty')
           DEVEL=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz")) | select(.name | contains("wine-devel"))] | .[0].browser_download_url // empty')
           ANY=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz"))] | .[0].browser_download_url // empty')
-          URL="${STAGING:-${DEVEL:-$ANY}}"
+          URL="${STABLE:-${STAGING:-${DEVEL:-$ANY}}}"
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
-      - name: Skip if already published
+      - name: Skip if already bundled
         if: |
           steps.current.outputs.version == steps.gcenx.outputs.tag &&
           inputs.force != 'true'
         run: |
-          echo "Engine ${{ steps.gcenx.outputs.tag }} is already published. Use force=true to re-publish."
+          echo "Engine ${{ steps.gcenx.outputs.tag }} already matches engine-version.txt. Use force=true to re-bundle."
           exit 0
 
       - name: Download Gcenx archive
@@ -83,8 +86,33 @@ jobs:
           ENTITLEMENTS: ${{ env.ENTITLEMENTS }}
         run: bash scripts/sign-engine.sh /tmp/engine
 
+      - name: Boot smoke test
+        run: |
+          # Initialize a throwaway prefix with uncorkedboot and verify wine64 reports a version.
+          # A failure here means the engine cannot launch; stop and produce no artifact.
+          export TMPPREFIX=$(mktemp -d)
+          /tmp/engine/bin/uncorkedboot --init "$TMPPREFIX" || {
+            echo "::error::uncorkedboot init failed -- engine cannot launch. Aborting."
+            exit 1
+          }
+          VERSION=$(/tmp/engine/bin/wine64 --version 2>/dev/null) || {
+            echo "::error::wine64 --version failed. Aborting."
+            exit 1
+          }
+          echo "Smoke test passed: $VERSION"
+          rm -rf "$TMPPREFIX"
+
+      - name: Measure uncompressed engine size
+        id: sizes
+        run: |
+          SIZE=$(du -sb /tmp/engine | awk '{print $1}')
+          echo "size_bytes=${SIZE}" >> $GITHUB_OUTPUT
+
       - name: Repack as tar.xz
-        run: cd /tmp && tar -cJf engine.tar.xz engine/
+        run: |
+          TAG="${{ steps.gcenx.outputs.tag }}"
+          cd /tmp && tar -cJf "uncorked-engine-${TAG}.tar.xz" engine/
+          mv "/tmp/uncorked-engine-${TAG}.tar.xz" /tmp/engine.tar.xz
 
       - name: Compute SHA-256
         id: sha256
@@ -92,69 +120,49 @@ jobs:
           SHA=$(shasum -a 256 /tmp/engine.tar.xz | awk '{print $1}')
           echo "sha256=${SHA}" >> $GITHUB_OUTPUT
 
-      - name: Generate manifest.json
+      - name: Generate engine-manifest.json
         run: |
           TAG="${{ steps.gcenx.outputs.tag }}"
           SHA="${{ steps.sha256.outputs.sha256 }}"
-          URL="https://data.grubwire.io/engine/${TAG}/engine.tar.xz"
-          printf '{\n  "version": "%s",\n  "url": "%s",\n  "sha256": "%s"\n}\n' \
-            "$TAG" "$URL" "$SHA" > /tmp/manifest.json
-          cat /tmp/manifest.json
+          SIZE="${{ steps.sizes.outputs.size_bytes }}"
+          URL="https://data.grubwire.io/engine/prod/archives/uncorked-engine-${TAG}.tar.xz"
+          printf '{\n  "schemaVersion": 1,\n  "engineVersion": "%s",\n  "upstreamTag": "%s",\n  "url": "%s",\n  "sha256": "%s",\n  "sizeBytes": %s,\n  "minAppVersion": "1.0.0"\n}\n' \
+            "$TAG" "$TAG" "$URL" "$SHA" "$SIZE" > /tmp/engine-manifest.json
+          cat /tmp/engine-manifest.json
 
       - name: Sign manifest
         env:
           ENGINE_MANIFEST_SIGNING_KEY: ${{ secrets.ENGINE_MANIFEST_SIGNING_KEY }}
-        run: bash scripts/sign-manifest.sh /tmp/manifest.json
+        run: bash scripts/sign-manifest.sh /tmp/engine-manifest.json
 
-      - name: Upload to R2
-        # Requires secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
-        # Set up via Checkpoint D (data.grubwire.io / Cloudflare R2 setup)
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          TAG: ${{ steps.gcenx.outputs.tag }}
+      - name: Rename archive for upload
         run: |
-          pip install awscli --quiet
-          # Version-specific archive (immutable)
-          aws s3 cp /tmp/engine.tar.xz \
-            "s3://${R2_BUCKET}/engine/${TAG}/engine.tar.xz" \
-            --endpoint-url "$R2_ENDPOINT"
-          # Manifest and signature (mutable: always the latest)
-          for DEST in engine staging/engine; do
-            aws s3 cp /tmp/manifest.json \
-              "s3://${R2_BUCKET}/${DEST}/manifest.json" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/json"
-            aws s3 cp /tmp/manifest.json.sig \
-              "s3://${R2_BUCKET}/${DEST}/manifest.json.sig" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/octet-stream"
-          done
+          TAG="${{ steps.gcenx.outputs.tag }}"
+          cp /tmp/engine.tar.xz "/tmp/uncorked-engine-${TAG}.tar.xz"
 
-      - name: Update engine-version.txt and push
-        run: |
-          echo "${{ steps.gcenx.outputs.tag }}" > engine-version.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add engine-version.txt
-          git commit -m "Publish engine ${{ steps.gcenx.outputs.tag }}"
-          git push
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ steps.gcenx.outputs.tag }}
+          path: |
+            /tmp/uncorked-engine-${{ steps.gcenx.outputs.tag }}.tar.xz
+            /tmp/engine-manifest.json
+            /tmp/engine-manifest.json.sig
+          retention-days: 30
 
       - name: Open tracking issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          TAG="${{ steps.gcenx.outputs.tag }}"
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "Engine ${{ steps.gcenx.outputs.tag }} published - verify before shipping" \
-            --body "Engine **${{ steps.gcenx.outputs.tag }}** has been signed and published to data.grubwire.io.
+            --title "Engine ${TAG} bundled - verify before promoting to prod" \
+            --body "Engine **${TAG}** has been built, signed, smoke-tested, and uploaded as a GitHub Actions artifact.
 
-          Verify before shipping a release:
+          Verify before promoting to prod:
           - [ ] Fresh install: setup flow downloads and installs engine cleanly
           - [ ] Create a test bottle and run a known-working .exe
           - [ ] DXVK loads correctly
           - [ ] Engine update flow: uninstall engine, relaunch, update offered and installs
-          - [ ] Ship a release (bump version, tag) when verified"
+          - [ ] When verified, run the **Promote engine to prod** workflow (engine-promote-prod.yml)"

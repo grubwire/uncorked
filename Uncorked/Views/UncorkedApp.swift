@@ -16,6 +16,7 @@
 //  If not, see https://www.gnu.org/licenses/.
 //
 
+import AppKit
 import SwiftUI
 import Sparkle
 import UncorkedKit
@@ -99,6 +100,11 @@ struct UncorkedApp: App {
                     UncorkedApp.wipeShaderCaches()
                 }
             }
+            CommandGroup(replacing: .appInfo) {
+                Button("About Uncorked") {
+                    openAboutWindow()
+                }
+            }
             CommandGroup(replacing: .help) {
                 Button("help.website") {
                     if let url = URL(string: "https://grubwire.io") {
@@ -115,11 +121,55 @@ struct UncorkedApp: App {
                         openURL(url)
                     }
                 }
+                Divider()
+                Button("Diagnostics...") {
+                    openDiagnosticsWindow()
+                }
             }
         }
         Settings {
             SettingsView()
         }
+    }
+
+    // MARK: - Window helpers
+
+    @MainActor private func openAboutWindow() {
+        let existing = NSApp.windows.first { $0.title == "About Uncorked" }
+        if let w = existing {
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let view = NSHostingView(rootView: AboutView())
+        let window = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 520),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "About Uncorked"
+        window.contentView = view
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    @MainActor private func openDiagnosticsWindow() {
+        let existing = NSApp.windows.first { $0.title == "Diagnostics" }
+        if let w = existing {
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let view = NSHostingView(rootView: DiagnosticsView())
+        let window = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Diagnostics"
+        window.contentView = view
+        window.center()
+        window.makeKeyAndOrderFront(nil)
     }
 
     @MainActor static func killBottles() {
