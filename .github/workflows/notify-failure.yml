@@ -33,7 +33,7 @@ jobs:
             --repo "${{ github.repository }}" \
             2>/dev/null || true
 
-      - name: Open failure issue
+      - name: Open or update failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -43,14 +43,31 @@ jobs:
           SHA="${{ github.event.workflow_run.head_sha }}"
           SHORT_SHA="${SHA:0:7}"
 
-          gh issue create \
+          # Deduplicate: if there is already an open ci-failure issue mentioning
+          # this workflow name (title or body), post a comment with the new run
+          # instead of opening a second issue. Substring match in JQ so that
+          # repurposed/renamed tracker issues still count.
+          EXISTING=$(gh issue list \
             --repo "${{ github.repository }}" \
-            --title "CI: ${WORKFLOW} failed on ${BRANCH} (${SHORT_SHA})" \
-            --label "ci-failure" \
-            --body "**${WORKFLOW}** failed on branch \`${BRANCH}\` at commit \`${SHORT_SHA}\`.
+            --state open \
+            --label ci-failure \
+            --json number,title,body \
+            --jq "[.[] | select((.title + \" \" + .body) | ascii_downcase | contains(\"$(echo "$WORKFLOW" | tr '[:upper:]' '[:lower:]')\"))] | .[0].number // empty")
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" \
+              --repo "${{ github.repository }}" \
+              --body "Another **${WORKFLOW}** failure on \`${BRANCH}\` at \`${SHORT_SHA}\`. Run: ${RUN_URL}"
+          else
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --title "CI: ${WORKFLOW} failed on ${BRANCH} (${SHORT_SHA})" \
+              --label "ci-failure" \
+              --body "**${WORKFLOW}** failed on branch \`${BRANCH}\` at commit \`${SHORT_SHA}\`.
 
           Run: ${RUN_URL}
 
           Check the run logs and fix before merging or releasing.
 
           _Close this issue once the failure is resolved._"
+          fi
