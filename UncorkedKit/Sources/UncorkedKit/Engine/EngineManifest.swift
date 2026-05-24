@@ -52,9 +52,9 @@ public enum EngineManifestClient {
     // Ed25519 public key (32 raw bytes, hex).
     // The corresponding private key (ENGINE_MANIFEST_SIGNING_KEY CI secret) signs
     // manifests at release time. Run `scripts/sign-manifest.sh` to produce a .sig file.
-    // Key generated 2026-05-23. Replace both key and CI secret together if rotating.
+    // Key generated 2026-05-24. Replace both key and CI secret together if rotating.
     private static let publicKeyHex =
-        "7b2e1e184049bb265afcd68c93d48116ebf952de980f280fc1a930c358aa8742"
+        "ad4fd39031fd57c059eb5a70b15f42e2271d4b7d722a34a98874126c30c4cbe2"
 
     // MARK: - Manifest URL (single isolated config value)
     // Stage 1: always prod. Switch to beta channel URL when the beta system is built (Part 2).
