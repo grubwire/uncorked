@@ -150,7 +150,7 @@ jobs:
           cat /tmp/engine-manifest.json
 
       - name: Install signing dependency
-        run: pip3 install cryptography
+        run: pip3 install cryptography --break-system-packages
 
       - name: Sign manifest
         env:
