@@ -149,6 +149,9 @@ jobs:
             "$TAG" "$TAG" "$URL" "$SHA" "$SIZE" > /tmp/engine-manifest.json
           cat /tmp/engine-manifest.json
 
+      - name: Install signing dependency
+        run: pip3 install cryptography
+
       - name: Sign manifest
         env:
           ENGINE_MANIFEST_SIGNING_KEY: ${{ secrets.ENGINE_MANIFEST_SIGNING_KEY }}

@@ -6,36 +6,46 @@
 #
 # Requires the private key PEM file at ENGINE_MANIFEST_KEY_FILE (env), or
 # reads the raw hex seed from ENGINE_MANIFEST_SIGNING_KEY (env, CI secret).
-set -euo pipefail
+#
+# ENGINE_MANIFEST_KEY_FILE path uses openssl (needs brew openssl on macOS,
+# not LibreSSL, for -rawin support). ENGINE_MANIFEST_SIGNING_KEY path uses
+# Python's cryptography library, which avoids all openssl version quirks.
+set -eo pipefail
 
 MANIFEST="$1"
 SIG="${MANIFEST}.sig"
 
 if [[ -n "${ENGINE_MANIFEST_KEY_FILE:-}" ]]; then
-    openssl pkeyutl -sign \
+    # Local use: sign with PEM file. Use Homebrew openssl if available (LibreSSL
+    # does not support -rawin). Falls back to system openssl as a last resort.
+    OPENSSL="$(brew --prefix openssl 2>/dev/null)/bin/openssl"
+    [[ -x "$OPENSSL" ]] || OPENSSL="openssl"
+    "$OPENSSL" pkeyutl -sign \
         -inkey "$ENGINE_MANIFEST_KEY_FILE" \
         -rawin \
         -in "$MANIFEST" \
         -out "$SIG"
 elif [[ -n "${ENGINE_MANIFEST_SIGNING_KEY:-}" ]]; then
-    # Build a minimal PKCS#8 DER wrapper around the 32-byte seed, then
-    # convert to PEM before signing. pkeyutl -inkey with PEM is universally
-    # supported across OpenSSL versions; -keyform der is not.
-    # Ed25519 PKCS#8 DER: 302e 0201 00 3005 0603 2b65 70 0422 0420 <seed>
-    KEY_HEX="${ENGINE_MANIFEST_SIGNING_KEY}"
-    printf '302e020100300506032b657004220420%s' "$KEY_HEX" \
-        | xxd -r -p > /tmp/_engine_sign.der
-    openssl pkey -inform DER -in /tmp/_engine_sign.der \
-        -outform PEM -out /tmp/_engine_sign.pem
-    openssl pkeyutl -sign \
-        -inkey /tmp/_engine_sign.pem \
-        -rawin \
-        -in "$MANIFEST" \
-        -out "$SIG"
-    rm -f /tmp/_engine_sign.der /tmp/_engine_sign.pem
+    # CI use: sign with raw hex seed via Python's cryptography library.
+    # This avoids openssl -rawin compatibility issues across LibreSSL and
+    # OpenSSL versions. ENGINE_MANIFEST_SIGNING_KEY is read from the env by
+    # the Python script, not passed on the command line.
+    python3 - "$MANIFEST" "$SIG" << 'PYEOF'
+import sys, os
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+manifest_path, sig_path = sys.argv[1], sys.argv[2]
+key = Ed25519PrivateKey.from_private_bytes(
+    bytes.fromhex(os.environ['ENGINE_MANIFEST_SIGNING_KEY'])
+)
+with open(manifest_path, 'rb') as f:
+    data = f.read()
+with open(sig_path, 'wb') as f:
+    f.write(key.sign(data))
+PYEOF
 else
     echo "Error: set ENGINE_MANIFEST_KEY_FILE or ENGINE_MANIFEST_SIGNING_KEY" >&2
     exit 1
 fi
 
-echo "Signed $MANIFEST -> $SIG ($(wc -c < "$SIG") bytes)"
+echo "Signed $MANIFEST -> $SIG ($(wc -c < "$SIG" | tr -d ' ') bytes)"
