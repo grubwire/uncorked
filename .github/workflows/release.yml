@@ -82,6 +82,30 @@ jobs:
           # Stable filename for the grubwire.io download link
           cp "$RUNNER_TEMP/Crosswire-${{ env.VERSION }}.dmg" "$RUNNER_TEMP/Crosswire.dmg"
 
+      # Always upload the DMG as a workflow artifact so it is recoverable from
+      # the run page even if a later publishing step (GitHub release or R2)
+      # fails.
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Crosswire-${{ env.VERSION }}-dmg
+          path: ${{ runner.temp }}/Crosswire-${{ env.VERSION }}.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      # Publish to GitHub releases before R2 so the draft release exists even
+      # if the R2 upload fails for credential or bucket reasons.
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3.0.0
+        with:
+          draft: true
+          generate_release_notes: true
+          tag_name: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
+          files: |
+            ${{ runner.temp }}/Crosswire-${{ env.VERSION }}.dmg
+            ${{ runner.temp }}/Crosswire.dmg
+
       - name: Upload DMG to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -96,20 +120,9 @@ jobs:
             "s3://${R2_BUCKET}/app/Crosswire-${{ env.VERSION }}.dmg" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "application/x-apple-diskimage"
-          # Stable pointer — always the latest (grubwire.io/download/crosswire proxies this)
+          # Stable pointer for the grubwire.io download link.
           aws s3 cp "$RUNNER_TEMP/Crosswire.dmg" \
             "s3://${R2_BUCKET}/app/Crosswire.dmg" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "application/x-apple-diskimage" \
             --cache-control "no-cache, no-store, must-revalidate"
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v3.0.0
-        with:
-          draft: true
-          generate_release_notes: true
-          tag_name: ${{ env.VERSION }}
-          name: ${{ env.VERSION }}
-          files: |
-            ${{ runner.temp }}/Crosswire-${{ env.VERSION }}.dmg
-            ${{ runner.temp }}/Crosswire.dmg
