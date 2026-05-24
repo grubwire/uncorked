@@ -35,7 +35,7 @@ jobs:
         id: current
         run: |
           VERSION=$(cat engine-version.txt 2>/dev/null | tr -d '[:space:]')
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Fetch latest Gcenx release
         id: gcenx
@@ -50,36 +50,44 @@ jobs:
           DEVEL=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz")) | select(.name | contains("wine-devel"))] | .[0].browser_download_url // empty')
           ANY=$(echo "$RESPONSE" | jq -r '[.assets[] | select(.name | endswith(".tar.xz"))] | .[0].browser_download_url // empty')
           URL="${STABLE:-${STAGING:-${DEVEL:-$ANY}}}"
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if already bundled
-        if: |
-          steps.current.outputs.version == steps.gcenx.outputs.tag &&
-          inputs.force != 'true'
+      - name: Check if bundle needed
+        id: gate
         run: |
-          echo "Engine ${{ steps.gcenx.outputs.tag }} already matches engine-version.txt. Use force=true to re-bundle."
-          exit 0
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.gcenx.outputs.tag }}"
+          if [[ "$CURRENT" == "$LATEST" ]] && [[ "${{ inputs.force }}" != 'true' ]]; then
+            echo "Engine $LATEST already matches engine-version.txt. Use force=true to re-bundle."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download Gcenx archive
+        if: steps.gate.outputs.needed == 'true'
         run: |
           curl -L -o /tmp/wine.tar.xz "${{ steps.gcenx.outputs.url }}"
 
       - name: Extract and locate Wine root
+        if: steps.gate.outputs.needed == 'true'
         run: |
           mkdir -p /tmp/engine-raw
           tar -xf /tmp/wine.tar.xz -C /tmp/engine-raw
-          WINE64=$(find /tmp/engine-raw -name wine64 -path "*/bin/wine64" | head -1)
+          WINE64=$(find /tmp/engine-raw -name wine64 -path "*/bin/wine64" | head -n 1)
           if [ -z "$WINE64" ]; then
-            WINE64=$(find /tmp/engine-raw -name wine -path "*/bin/wine" | head -1)
+            WINE64=$(find /tmp/engine-raw -name wine -path "*/bin/wine" | head -n 1)
           fi
           WINE_ROOT=$(dirname "$(dirname "$WINE64")")
           mv "$WINE_ROOT" /tmp/engine
 
       - name: Generate wrapper scripts
+        if: steps.gate.outputs.needed == 'true'
         run: bash scripts/generate-wrappers.sh /tmp/engine/bin
 
       - name: Sign all Mach-O files
+        if: steps.gate.outputs.needed == 'true'
         env:
           IDENTITY: ${{ env.IDENTITY }}
           RUNTIME: ${{ env.RUNTIME }}
@@ -87,6 +95,7 @@ jobs:
         run: bash scripts/sign-engine.sh /tmp/engine
 
       - name: Boot smoke test
+        if: steps.gate.outputs.needed == 'true'
         id: smoke_test
         run: |
           # Initialize a throwaway prefix with uncorkedboot (wraps wineboot).
@@ -115,31 +124,35 @@ jobs:
             --title "Engine ${TAG} failed smoke test" \
             --body "Engine **${TAG}** downloaded from Gcenx but failed the boot smoke test.
 
-          The engine binary could not launch or \`wine64 --version\` returned an error.
+          The engine binary could not launch or \`wineboot --init\` returned an error.
           No artifact was produced. Do not promote this engine to prod.
 
           Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Measure uncompressed engine size
+        if: steps.gate.outputs.needed == 'true'
         id: sizes
         run: |
           # macOS du uses BSD syntax: -sk gives kibibytes; multiply by 1024 for bytes.
           SIZE=$(du -sk /tmp/engine | awk '{print $1 * 1024}')
-          echo "size_bytes=${SIZE}" >> $GITHUB_OUTPUT
+          echo "size_bytes=${SIZE}" >> "$GITHUB_OUTPUT"
 
       - name: Repack as tar.xz
+        if: steps.gate.outputs.needed == 'true'
         run: |
           TAG="${{ steps.gcenx.outputs.tag }}"
           cd /tmp && tar -cJf "uncorked-engine-${TAG}.tar.xz" engine/
           mv "/tmp/uncorked-engine-${TAG}.tar.xz" /tmp/engine.tar.xz
 
       - name: Compute SHA-256
+        if: steps.gate.outputs.needed == 'true'
         id: sha256
         run: |
           SHA=$(shasum -a 256 /tmp/engine.tar.xz | awk '{print $1}')
-          echo "sha256=${SHA}" >> $GITHUB_OUTPUT
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Generate engine-manifest.json
+        if: steps.gate.outputs.needed == 'true'
         run: |
           TAG="${{ steps.gcenx.outputs.tag }}"
           SHA="${{ steps.sha256.outputs.sha256 }}"
@@ -150,19 +163,23 @@ jobs:
           cat /tmp/engine-manifest.json
 
       - name: Install signing dependency
+        if: steps.gate.outputs.needed == 'true'
         run: pip3 install cryptography --break-system-packages
 
       - name: Sign manifest
+        if: steps.gate.outputs.needed == 'true'
         env:
           ENGINE_MANIFEST_SIGNING_KEY: ${{ secrets.ENGINE_MANIFEST_SIGNING_KEY }}
         run: bash scripts/sign-manifest.sh /tmp/engine-manifest.json
 
       - name: Rename archive for upload
+        if: steps.gate.outputs.needed == 'true'
         run: |
           TAG="${{ steps.gcenx.outputs.tag }}"
           cp /tmp/engine.tar.xz "/tmp/uncorked-engine-${TAG}.tar.xz"
 
       - name: Upload artifact
+        if: steps.gate.outputs.needed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: engine-${{ steps.gcenx.outputs.tag }}
@@ -173,6 +190,7 @@ jobs:
           retention-days: 30
 
       - name: Open tracking issue
+        if: steps.gate.outputs.needed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
