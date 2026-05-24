@@ -22,6 +22,16 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Ensure ci-failure label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create ci-failure \
+            --color D93F0B \
+            --description "Opened automatically when a CI workflow fails" \
+            --repo "${{ github.repository }}" \
+            2>/dev/null || true
+
       - name: Open failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +52,4 @@ jobs:
 
           Check the run logs and fix before merging or releasing.
 
-          _Close this issue once the failure is resolved._" \
-          || true
-          # '|| true' prevents this step from failing if 'ci-failure' label does not exist yet.
-          # Create the label once with: gh label create ci-failure --color D93F0B --repo grubwire/Uncorked
+          _Close this issue once the failure is resolved._"
