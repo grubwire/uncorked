@@ -1,0 +1,181 @@
+commit c0e16d281470a881cec5bdd5adb5142a81a8b61b
+Author: nick <98576999+nicolassanchez02@users.noreply.github.com>
+Date:   Sat May 23 12:59:05 2026 -0500
+
+    Step 11: update CLAUDE.md to reflect Stage 1 architecture and Checkpoint D status
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+new file mode 100644
+index 00000000..9af2aee4
+--- /dev/null
++++ b/CLAUDE.md
+@@ -0,0 +1,169 @@
++# Uncorked - Project Context for Claude
++
++## What Uncorked Is
++
++Uncorked is a standalone macOS app for running Windows software. It is a fork of
++[Whisky](https://github.com/Whisky-App/Whisky), fully rebranded in May 2026.
++Published by Grubwire (grubwire.io) under GPL-3.0.
++
++**There is no "Wine" in Uncorked. There is no "engine" visible to users. There is only Uncorked.**
++
++The Windows compatibility engine (Wine, sourced from Gcenx) is an internal implementation
++detail. Users install Uncorked, it works. That is the entire experience.
++
++## Current Architecture (Stage 1 - cloud-hosted engine)
++
++```
++Uncorked (SwiftUI app)
++└── UncorkedKit (Swift package, local dependency)
++    ├── Engine/         - UncorkedEngine, RosettaCheck, EngineManifest, bin path management
++    ├── Wine/           - Wine process management (class name Wine kept for internal use)
++    ├── Uncorked/       - Bottle, Program, BottleSettings models
++    ├── PE/             - PE binary parsing
++    └── Extensions/     - Swift extensions
++
++Engine hosted at: data.grubwire.io/engine/
++  manifest.json       - {version, url, sha256}, Ed25519-signed
++  manifest.json.sig   - 64-byte raw Ed25519 signature
++  staging/manifest.*  - staging copies (same content, for DEBUG builds)
++  <tag>/engine.tar.xz - Gcenx archive, re-signed by Grubwire CI
++
++Engine installed at: ~/Library/Application Support/Uncorked/Libraries/Wine/
++  bin/    - wine64, wineserver, wineboot, uncorked64 (wrapper), etc.
++  lib/    - .dylib and Mach-O .so files
++  share/
++```
++
++## How the Engine Gets to Users
++
++1. `engine-update-check.yml` (weekly cron): compares `engine-version.txt` to latest Gcenx tag.
++   Opens a GitHub issue if a newer version is available.
++2. Human reviews the Gcenx release, then runs `engine-bundle.yml` via Actions tab.
++3. `engine-bundle.yml`: downloads from Gcenx, generates wrappers, signs all Mach-O files
++   (Phase 1: ad-hoc), repacks, computes SHA-256, generates and signs `manifest.json`,
++   uploads to R2 (Cloudflare), commits `engine-version.txt`, opens a tracking issue.
++4. Human tests (fresh install, bottle creation, known .exe), ships a Uncorked release.
++5. App fetches manifest on first launch, downloads engine, verifies SHA-256, extracts to
++   Application Support, clears quarantine.
++
++## Engine Manifest Signing
++
++The manifest is signed with Ed25519 (CryptoKit `Curve25519.Signing`).
++
++- Public key (embedded in `EngineManifest.swift`): `7b2e1e184049bb265afcd68c93d48116ebf952de980f280fc1a930c358aa8742`
++- Private key (hex seed): stored in GitHub secret `ENGINE_MANIFEST_SIGNING_KEY`
++  - PEM backup at `~/.engine-manifest-key.txt` on nick-dev-01 (NOT in repo)
++  - To sign a manifest: `bash scripts/sign-manifest.sh manifest.json`
++
++## Gcenx: The Engine Upstream
++
++Gcenx (GitHub: `Gcenx/macOS_Wine_builds`) compiles Wine for macOS with Apple Silicon patches.
++
++### Asset Naming (as of 2026-05, release 11.9)
++
++wine-stable was dropped. Only `wine-staging` and `wine-devel` exist.
++
++Asset priority: `wine-staging-*` > `wine-devel-*` > any `.tar.xz`
++
++Tag format: bare version number (`11.9`), no prefix.
++
++Asset sizes: ~190MB tar.xz each.
++
++## Signing Rules — Critical
++
++**NEVER use `codesign --force --deep`.** It is deprecated and unreliable.
++
++Sign every Mach-O file individually, inside-out, detected by `file` not extension:
++1. All `.dylib` files anywhere in the engine tree
++2. All Mach-O `.so` files under `lib/wine/` (Wine builtins — Mach-O on macOS)
++3. All Mach-O executables under `bin/` and anywhere else
++4. Skip: shell wrapper scripts, PE `.dll` files, data files
++
++The signing script: `scripts/sign-engine.sh`
++
++### Phase 1 (current — no Developer ID)
++
++- `IDENTITY=-` (ad-hoc), no `--options runtime`, no entitlements
++- Ad-hoc is sufficient for Apple Silicon; every Mach-O must be signed or it is killed on launch
++- Gatekeeper on macOS 15+ Sequoia: user must go to System Settings > Privacy & Security >
++  Open Anyway on first launch. Right-click Open bypass was removed in Sequoia.
++
++### Phase 2 (future — requires Apple Developer account, not yet set up)
++
++- `IDENTITY="Developer ID Application: ..."`, `--options runtime --timestamp`
++- Add `scripts/engine.entitlements` with Wine exception entitlements:
++  `cs.allow-unsigned-executable-memory`, `cs.disable-library-validation`,
++  `cs.allow-dyld-environment-variables`
++- Enable `ENABLE_HARDENED_RUNTIME = YES` in Xcode release config
++- Notarize app, staple, notarize DMG, staple DMG
++- Phase 2 is NOT a pure credentials swap — entitlements file and Xcode config changes required
++- Only Developer ID Application cert needed (DMG-only distribution)
++
++## Distribution
++
++**DMG only.** One artifact for both first install and Sparkle updates.
++
++Sparkle uses DMG-based app replacement (no admin prompt). Do not use PKG-based Sparkle updates.
++
++## Version Scheme
++
++Uncorked version is fully decoupled from engine version. Engine version never appears in
++Uncorked's version string.
++
++- Engine update: patch bump (1.0.2 → 1.0.3)
++- Currently published engine tag recorded in `engine-version.txt` (repo root)
++- In-app engine version stored in `UncorkedEngineVersion.plist` (under Libraries, diagnostics only)
++
++## Key Files
++
++| File | Purpose |
++|------|---------|
++| `UncorkedKit/.../Engine/UncorkedEngine.swift` | Engine install, verify, update check, bin paths |
++| `UncorkedKit/.../Engine/EngineManifest.swift` | Manifest model, Ed25519 verification, SHA-256 |
++| `UncorkedKit/.../Engine/RosettaCheck.swift` | Apple Silicon detection, Rosetta install |
++| `Uncorked/Views/Setup/EngineSetupView.swift` | Unified download + verify + install setup UI |
++| `scripts/sign-engine.sh` | Inside-out Mach-O signing (Phase 1 and 2) |
++| `scripts/sign-manifest.sh` | Signs manifest.json with Ed25519 private key |
++| `scripts/generate-wrappers.sh` | Generates uncorked64, uncorkedserver, uncorkedboot |
++| `engine-version.txt` | Currently published engine tag (updated by CI) |
++| `.github/workflows/engine-bundle.yml` | Full publish pipeline (Gcenx → R2) |
++| `.github/workflows/engine-update-check.yml` | Weekly check for new Gcenx releases |
++| `.github/workflows/release.yml` | App build, sign, DMG, GitHub release |
++
++## Pending: Checkpoint D (R2 / data.grubwire.io setup)
++
++**Requires Nick's Cloudflare account.** Not yet configured.
++
++Steps needed:
++1. Create an R2 bucket (e.g. `uncorked-engine`)
++2. Create a Cloudflare Worker or public bucket URL at `data.grubwire.io`
++3. Add GitHub secrets: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
++4. Add `ENGINE_MANIFEST_SIGNING_KEY` (hex private key seed) to GitHub secrets
++5. Run `engine-bundle.yml` for the first time to publish the engine
++6. Verify the app can download the engine in a fresh install
++
++Until Checkpoint D is done, new installs will fail at the engine download step (EngineSetupView
++shows the error and a Retry button).
++
++## Migration (existing users)
++
++On first launch after upgrade, `removeLegacyEngineIfNeeded()` runs once and deletes the stale
++engine at `Libraries/Wine` only if `UncorkedEngineVersion.plist` is absent (indicating the
++pre-managed engine, not a freshly downloaded managed one). Bottles and wineprefixes are preserved.
++
++## Internal Naming Rules
++
++- All Swift code calls `uncorked64` by absolute path, never `wine64` directly.
++- No user-facing strings mention Wine, engine, wrappers, or internal version numbers.
++- The `Wine` class in `Wine.swift` keeps its name internally (user decision, backward compat).
++- Winetricks is a proper noun kept throughout (not renamed).
++- `wineVersion` remains the persisted `BottleSettings` key (backward compat with existing bottles).
++
++## Sparkle Phase 1 to Phase 2 Transition
++
++Do NOT regenerate the Sparkle EdDSA key. Test ad-hoc to Developer ID update path explicitly
++before relying on it. Include direct DMG link in the transition release notes.
++
++## Whisky Reference
++
++Uncorked is a fork of Whisky. For reference: `https://github.com/Whisky-App/Whisky`
