@@ -20,13 +20,11 @@ import SwiftUI
 import AppKit
 import CrosswireKit
 import SemanticVersion
-import Sparkle
 
 struct ContentView: View {
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
-    let updater: SPUUpdater
 
     @State var bottlesLoaded: Bool = false
     @State var searchText: String = ""
@@ -36,9 +34,8 @@ struct ContentView: View {
     @State var settingsBottle: Bottle?
     @State var provisioningMessage: String?
 
-    init(showSetup: Binding<Bool>, updater: SPUUpdater) {
+    init(showSetup: Binding<Bool>) {
         self._showSetup = showSetup
-        self.updater = updater
     }
 
     var body: some View {
@@ -84,15 +81,6 @@ struct ContentView: View {
             Text("Crosswire")
                 .font(.system(size: 22, weight: .semibold))
             Spacer()
-            Button {
-                updater.checkForUpdates()
-            } label: {
-                Image(systemName: "arrow.down.circle")
-                    .imageScale(.large)
-            }
-            .buttonStyle(.borderless)
-            .help("Check for Updates")
-
             SettingsLink {
                 Image(systemName: "gearshape")
                     .imageScale(.large)
@@ -177,7 +165,10 @@ struct ContentView: View {
                         },
                         onOpenSettings: { settingsBottle = bottle }
                     )
-                    Divider().padding(.leading, 72)
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.leading, 78)
                 }
             }
         }
@@ -274,13 +265,6 @@ struct ProvisioningOverlay: View {
 }
 
 #Preview {
-    ContentView(
-        showSetup: .constant(false),
-        updater: SPUStandardUpdaterController(
-            startingUpdater: false,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        ).updater
-    )
-    .environmentObject(BottleVM.shared)
+    ContentView(showSetup: .constant(false))
+        .environmentObject(BottleVM.shared)
 }

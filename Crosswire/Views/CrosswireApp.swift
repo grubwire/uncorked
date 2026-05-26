@@ -37,7 +37,7 @@ struct CrosswireApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(showSetup: $showSetup, updater: updaterController.updater)
+            ContentView(showSetup: $showSetup)
                 .frame(minWidth: ViewWidth.large, minHeight: 316)
                 .environmentObject(BottleVM.shared)
                 .onAppear {

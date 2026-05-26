@@ -21,26 +21,32 @@ import AppKit
 import UniformTypeIdentifiers
 import CrosswireKit
 
-/// Per-app settings sheet. Replaces the old BottleView/ProgramsView/
-/// WinetricksView flow from the main window. Surfaces just the controls a
-/// user needs to manage one installed app.
+/// Per-app settings sheet. Default view is name + Run + Uninstall. Anything
+/// that exposes the underlying Wine prefix (path, Windows version, DXVK,
+/// raw exe list) lives behind the Advanced disclosure.
 struct AppSettingsSheet: View {
     @ObservedObject var bottle: Bottle
     var onDelete: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var primarySelection: URL?
+    @State private var showAdvanced: Bool = false
 
     var body: some View {
         NavigationStack {
             Form {
-                generalSection
-                programsSection
-                advancedSection
-                dangerSection
+                primarySection
+                Section {
+                    DisclosureGroup(isExpanded: $showAdvanced) {
+                        advancedContent
+                    } label: {
+                        Text("Advanced")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                }
             }
             .formStyle(.grouped)
-            .navigationTitle(bottle.settings.name)
+            .navigationTitle(bottle.displayName)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -48,7 +54,7 @@ struct AppSettingsSheet: View {
                 }
             }
         }
-        .frame(minWidth: 480, minHeight: 540)
+        .frame(minWidth: 480, minHeight: 420)
         .onAppear {
             primarySelection = bottle.settings.primaryProgramURL
             if bottle.programs.isEmpty {
@@ -57,79 +63,121 @@ struct AppSettingsSheet: View {
         }
     }
 
-    private var generalSection: some View {
-        Section("General") {
-            LabeledContent("Installed at") {
-                Text(bottle.url.prettyPath())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-            }
-            Picker("Windows version", selection: $bottle.settings.windowsVersion) {
-                ForEach(WinVersion.allCases.reversed(), id: \.self) {
-                    Text($0.pretty()).tag($0)
+    @ViewBuilder
+    private var primarySection: some View {
+        Section {
+            HStack(spacing: 12) {
+                AppTileIcon(name: bottle.displayName)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bottle.displayName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(1)
+                    if bottle.userVisiblePrograms.count > 1 {
+                        Text("^[\(bottle.userVisiblePrograms.count) launcher](inflect: true)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                Spacer()
             }
-            Toggle("DXVK (DirectX to Vulkan)", isOn: $bottle.settings.dxvk)
+            .padding(.vertical, 4)
+
+            Button {
+                runPrimaryFromSheet()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                    Text("Run")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!bottle.isAvailable || resolvedPrimaryProgram == nil)
+
+            Button(role: .destructive) {
+                confirmDelete()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "trash")
+                    Text("Uninstall")
+                }
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(.red)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
         }
     }
 
     @ViewBuilder
-    private var programsSection: some View {
-        Section("Programs") {
-            if bottle.programs.isEmpty {
-                Text("No installed programs detected yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("Primary launcher", selection: $primarySelection) {
-                    Text("None").tag(URL?.none)
-                    ForEach(bottle.programs) { program in
-                        Text(program.name.replacingOccurrences(of: ".exe", with: ""))
-                            .tag(Optional(program.url))
-                    }
-                }
-                .onChange(of: primarySelection) { _, newValue in
-                    bottle.settings.primaryProgramURL = newValue
-                }
+    private var advancedContent: some View {
+        LabeledContent("Installed at") {
+            Text(bottle.url.prettyPath())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .lineLimit(2)
+                .truncationMode(.middle)
+        }
+        Picker("Windows version", selection: $bottle.settings.windowsVersion) {
+            ForEach(WinVersion.allCases.reversed(), id: \.self) {
+                Text($0.pretty()).tag($0)
+            }
+        }
+        Toggle("DXVK (DirectX to Vulkan)", isOn: $bottle.settings.dxvk)
+
+        Picker("Primary launcher", selection: $primarySelection) {
+            Text("None").tag(URL?.none)
+            ForEach(bottle.programs) { program in
+                Text(program.name.replacingOccurrences(of: ".exe", with: ""))
+                    .tag(Optional(program.url))
+            }
+        }
+        .onChange(of: primarySelection) { _, newValue in
+            bottle.settings.primaryProgramURL = newValue
+        }
+
+        if !bottle.programs.isEmpty {
+            DisclosureGroup("All installed programs (\(bottle.programs.count))") {
                 ForEach(bottle.programs) { program in
                     HStack {
                         Text(program.name.replacingOccurrences(of: ".exe", with: ""))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         Spacer()
                         Button("Run") { runProgram(program) }
+                            .buttonStyle(.borderless)
                     }
                 }
             }
-            Button("Rescan installed programs") {
-                bottle.updateInstalledPrograms()
-            }
+        }
+
+        Button("Rescan installed programs") {
+            bottle.finalizeAppIdentity()
+        }
+        Button("Open in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
+        }
+        Button("Open Terminal") {
+            bottle.openTerminal()
+        }
+        Button("Run a .exe inside this app...") {
+            pickAdHocExecutable()
         }
     }
 
-    private var advancedSection: some View {
-        Section("Advanced") {
-            Button("Open in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
-            }
-            Button("Open Terminal") {
-                bottle.openTerminal()
-            }
-            Button("Run a .exe inside this app...") {
-                pickAdHocExecutable()
-            }
+    private var resolvedPrimaryProgram: Program? {
+        if let url = bottle.settings.primaryProgramURL,
+           let match = bottle.programs.first(where: { $0.url == url }) {
+            return match
         }
+        if let first = bottle.userVisiblePrograms.first { return first }
+        return bottle.programs.first
     }
 
-    private var dangerSection: some View {
-        Section {
-            Button(role: .destructive) {
-                confirmDelete()
-            } label: {
-                Text("Delete app").foregroundStyle(.red)
-            }
-        } header: {
-            Text("Danger")
-        }
+    private func runPrimaryFromSheet() {
+        guard let program = resolvedPrimaryProgram else { return }
+        runProgram(program)
     }
 
     private func runProgram(_ program: Program) {
@@ -174,7 +222,7 @@ struct AppSettingsSheet: View {
 
     private func confirmDelete() {
         let alert = NSAlert()
-        alert.messageText = "Delete \(bottle.settings.name)?"
+        alert.messageText = "Uninstall \(bottle.displayName)?"
         alert.informativeText = "This removes the app's files and cannot be undone."
         alert.alertStyle = .warning
         let delete = alert.addButton(withTitle: "Delete")

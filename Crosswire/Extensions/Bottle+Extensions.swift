@@ -141,6 +141,129 @@ extension Bottle {
         self.programs = programs.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
+    /// A user-facing entry the installer registered with Windows. Display
+    /// name comes from the Start Menu .lnk filename; URL is the .lnk's
+    /// target.
+    struct DetectedAppEntry {
+        let displayName: String
+        let url: URL
+    }
+
+    /// Non-destructive Start Menu scan. Returns entries with their display
+    /// names, filtered to exclude obvious noise (uninstallers, updaters,
+    /// help/website shortcuts, anything pointing into the Windows
+    /// directory). Unlike `getStartMenuPrograms()` this does not delete the
+    /// .lnk files, so it can run repeatedly.
+    func scanStartMenuEntries() -> [DetectedAppEntry] {
+        let startMenus = [
+            url.appending(path: "drive_c/ProgramData/Microsoft/Windows/Start Menu"),
+            url.appending(path: "drive_c/users/crossover/AppData/Roaming/Microsoft/Windows/Start Menu")
+        ]
+
+        var linkURLs: [URL] = []
+        for root in startMenus {
+            let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+            while let candidate = enumerator?.nextObject() as? URL {
+                if candidate.pathExtension.lowercased() == "lnk" {
+                    linkURLs.append(candidate)
+                }
+            }
+        }
+
+        let windowsDir = url.appending(path: "drive_c/windows").path
+        var seenTargets: Set<URL> = []
+        var entries: [DetectedAppEntry] = []
+
+        for link in linkURLs.sorted(by: { $0.lastPathComponent.lowercased() < $1.lastPathComponent.lowercased() }) {
+            let displayName = link.deletingPathExtension().lastPathComponent
+            if Bottle.isNoiseEntryName(displayName) { continue }
+            guard let handle = try? FileHandle(forReadingFrom: link) else { continue }
+            defer { try? handle.close() }
+            guard let program = ShellLinkHeader.getProgram(url: link, handle: handle, bottle: self) else { continue }
+            let target = program.url
+            if seenTargets.contains(target) { continue }
+            if target.path.hasPrefix(windowsDir) { continue }
+            if Bottle.isNoiseEntryName(target.deletingPathExtension().lastPathComponent) { continue }
+            seenTargets.insert(target)
+            entries.append(DetectedAppEntry(displayName: displayName, url: target))
+        }
+
+        return entries
+    }
+
+    private static func isNoiseEntryName(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        let patterns = [
+            "uninstall", "unins000", "unins001",
+            "setup", "installer",
+            "update", "updater", "gup",
+            "readme", "read me", "help", "user manual", "manual",
+            "website", "on the web", "homepage",
+            "change log", "changelog", "release notes",
+            "register", "activation",
+            "crash", "report",
+            "vc_redist", "vcredist", "dxsetup", "directx",
+            "winetricks"
+        ]
+        return patterns.contains { lower.contains($0) }
+    }
+
+    /// Run after an install completes. Picks the app's display name and
+    /// primary launcher from Start Menu entries (or falls back to a
+    /// filtered Program Files sweep when the installer left no shortcuts).
+    /// Persists both on the bottle settings.
+    func finalizeAppIdentity() {
+        let startMenu = scanStartMenuEntries()
+        if !startMenu.isEmpty {
+            settings.appDisplayName = startMenu[0].displayName
+            settings.userVisibleProgramURLs = startMenu.map(\.url)
+            if settings.primaryProgramURL == nil
+                || !startMenu.contains(where: { $0.url == settings.primaryProgramURL }) {
+                settings.primaryProgramURL = startMenu[0].url
+            }
+            updateInstalledPrograms()
+            return
+        }
+
+        // No Start Menu entries. Fall back to filtering Program Files,
+        // skipping uninstallers/updaters/etc. Used for installers that
+        // never created shortcuts and for portable .exes.
+        updateInstalledPrograms()
+        let visible = programs
+            .map(\.url)
+            .filter { !Bottle.isNoiseEntryName($0.deletingPathExtension().lastPathComponent) }
+
+        guard !visible.isEmpty else {
+            settings.userVisibleProgramURLs = []
+            return
+        }
+
+        settings.userVisibleProgramURLs = visible
+        if settings.primaryProgramURL == nil
+            || !visible.contains(settings.primaryProgramURL!) {
+            settings.primaryProgramURL = visible[0]
+        }
+    }
+
+    /// Programs the user should see in the main UI. Built from the
+    /// detected user-visible URLs when available, otherwise the full
+    /// program list (legacy bottles or fresh installs that have not yet
+    /// completed detection).
+    var userVisiblePrograms: [Program] {
+        guard let visible = settings.userVisibleProgramURLs else { return programs }
+        return programs.filter { visible.contains($0.url) }
+    }
+
+    /// Name shown in the main app list. Prefer the app's own identity over
+    /// the installer's filename.
+    var displayName: String {
+        settings.appDisplayName ?? settings.name
+    }
+
     @MainActor
     func move(destination: URL) {
         do {

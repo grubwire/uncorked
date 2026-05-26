@@ -49,6 +49,11 @@ public struct BottleInfo: Codable, Equatable {
     var pins: [PinnedProgram] = []
     var blocklist: [URL] = []
     var primaryProgramURL: URL?
+    // Set after install completes. Nil means detection has never run
+    // (legacy bottles, or in-flight); the UI falls back to the bottle name
+    // and full program list in that case.
+    var appDisplayName: String?
+    var userVisibleProgramURLs: [URL]?
 
     public init() {}
 
@@ -58,6 +63,8 @@ public struct BottleInfo: Codable, Equatable {
         self.pins = try container.decodeIfPresent([PinnedProgram].self, forKey: .pins) ?? []
         self.blocklist = try container.decodeIfPresent([URL].self, forKey: .blocklist) ?? []
         self.primaryProgramURL = try container.decodeIfPresent(URL.self, forKey: .primaryProgramURL)
+        self.appDisplayName = try container.decodeIfPresent(String.self, forKey: .appDisplayName)
+        self.userVisibleProgramURLs = try container.decodeIfPresent([URL].self, forKey: .userVisibleProgramURLs)
     }
 }
 
@@ -214,6 +221,24 @@ public struct BottleSettings: Codable, Equatable {
     public var primaryProgramURL: URL? {
         get { return info.primaryProgramURL }
         set { info.primaryProgramURL = newValue }
+    }
+
+    /// Display name derived from the app itself (Start Menu entry the
+    /// installer created, exe VERSIONINFO, or registry DisplayName). When
+    /// nil the UI falls back to `name`, which is the installer's filename.
+    public var appDisplayName: String? {
+        get { return info.appDisplayName }
+        set { info.appDisplayName = newValue }
+    }
+
+    /// The subset of installed programs the user should see in the main UI
+    /// (typically the Start Menu entries). Nil means detection has never
+    /// run on this bottle, so the UI should fall back to showing everything
+    /// under Program Files. An empty array means detection ran and found
+    /// no user-facing entries.
+    public var userVisibleProgramURLs: [URL]? {
+        get { return info.userVisibleProgramURLs }
+        set { info.userVisibleProgramURLs = newValue }
     }
 
     public var enhancedSync: EnhancedSync {

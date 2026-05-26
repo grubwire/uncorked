@@ -32,37 +32,33 @@ struct AppRow: View {
     @State private var hovered: Bool = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            AppTileIcon(name: bottle.settings.name)
+        HStack(spacing: 14) {
+            AppTileIcon(name: bottle.displayName, side: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(bottle.settings.name)
-                    .font(.system(size: 14, weight: .medium))
+                Text(bottle.displayName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
-                if bottle.programs.count > 1 {
-                    Text("\(bottle.programs.count) programs")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                } else if bottle.inFlight {
+                    .truncationMode(.tail)
+                if bottle.inFlight {
                     Text("Setting up...")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
-            Spacer()
+            Spacer(minLength: 12)
             controls
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .frame(minHeight: 56)
+        .frame(minHeight: 60)
         .contentShape(Rectangle())
-        .background(hovered ? Color.primary.opacity(0.05) : Color.clear)
+        .background(hovered ? Color.primary.opacity(0.07) : Color.clear)
         .onHover { hovered = $0 }
         .onTapGesture(count: 2) { onRun() }
         .onTapGesture { onPrimaryAction() }
         .opacity(bottle.isAvailable ? 1.0 : 0.5)
         .onAppear {
-            // Pull the program list so "X programs" is accurate without
-            // requiring the user to open the settings sheet first.
             if bottle.isAvailable && bottle.programs.isEmpty {
                 bottle.updateInstalledPrograms()
             }
@@ -71,11 +67,13 @@ struct AppRow: View {
 
     @ViewBuilder
     private var controls: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             playButton
             Button(action: onOpenSettings) {
                 Image(systemName: "gearshape")
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
             }
             .buttonStyle(.borderless)
             .help("Settings")
@@ -87,12 +85,12 @@ struct AppRow: View {
 
     @ViewBuilder
     private var playButton: some View {
-        if bottle.programs.count > 1 {
+        let visible = bottle.userVisiblePrograms
+        if visible.count > 1 {
             Button {
                 showProgramMenu = true
             } label: {
-                Image(systemName: "play.fill")
-                    .frame(width: 28, height: 28)
+                playLabel
             }
             .buttonStyle(.borderless)
             .help("Run")
@@ -103,13 +101,27 @@ struct AppRow: View {
             Button {
                 onRun()
             } label: {
-                Image(systemName: "play.fill")
-                    .frame(width: 28, height: 28)
+                playLabel
             }
             .buttonStyle(.borderless)
             .disabled(bottle.programs.isEmpty || !bottle.isAvailable)
             .help("Run")
         }
+    }
+
+    /// Play affordance. Subtle glyph at rest, accent-tinted fill on row
+    /// hover so the primary action becomes obvious without competing for
+    /// attention across every row simultaneously.
+    @ViewBuilder
+    private var playLabel: some View {
+        Image(systemName: "play.fill")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(hovered ? Color.white : Color.secondary)
+            .frame(width: 30, height: 30)
+            .background(
+                Circle()
+                    .fill(hovered ? Color.accentColor : Color.primary.opacity(0.08))
+            )
     }
 
     private var programPickerPopover: some View {
@@ -120,7 +132,7 @@ struct AppRow: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
-            ForEach(bottle.programs) { program in
+            ForEach(bottle.userVisiblePrograms) { program in
                 Button {
                     showProgramMenu = false
                     onRunSpecific(program)

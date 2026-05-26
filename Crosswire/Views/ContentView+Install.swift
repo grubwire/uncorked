@@ -66,7 +66,7 @@ extension ContentView {
         } catch {
             print("Failed to run installer: \(error)")
         }
-        bottle.updateInstalledPrograms()
+        bottle.finalizeAppIdentity()
         provisioningMessage = nil
     }
 
@@ -95,11 +95,16 @@ extension ContentView {
             return
         }
 
-        if programs.count == 1 {
+        let visible = bottle.userVisiblePrograms
+        if visible.count == 1 {
+            run(program: visible[0], bottle: bottle)
+        } else if visible.count > 1 {
+            run(program: visible[0], bottle: bottle)
+        } else if programs.count == 1 {
             run(program: programs[0], bottle: bottle)
         } else {
-            // Multiple programs and no primary chosen yet — open the
-            // settings sheet so the user can pick one explicitly.
+            // No detection has run and no primary is set; open settings
+            // so the user can pick one explicitly.
             settingsBottle = bottle
         }
     }
