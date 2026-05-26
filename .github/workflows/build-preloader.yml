@@ -90,6 +90,12 @@ jobs:
           export CXX="clang++ -arch x86_64"
           export CFLAGS="-arch x86_64"
           export LDFLAGS="-arch x86_64"
+          # NOTE: do NOT pass --without-mingw. That empties enable_archs and
+          # the x86_64-darwin PE_ARCHS check at configure.ac:703 hard-errors.
+          # mingw-w64 is on PATH via brew so the cross-compiler probe finds
+          # x86_64-w64-mingw32-gcc, populates PE_ARCHS, and check passes.
+          # We still only build loader/wine afterwards, so no PE DLLs get
+          # compiled despite mingw being available.
           ./configure \
             --host=x86_64-apple-darwin \
             --enable-win64 \
@@ -97,7 +103,7 @@ jobs:
             --without-alsa --without-capi --without-coreaudio --without-cups \
             --without-dbus --without-fontconfig --without-freetype --without-gettext \
             --without-gphoto --without-gnutls --without-gssapi --without-gstreamer \
-            --without-inotify --without-krb5 --without-mingw \
+            --without-inotify --without-krb5 \
             --without-netapi --without-opencl --without-opengl --without-pcap \
             --without-pcsclite --without-pulse --without-sane --without-sdl \
             --without-udev --without-usb --without-v4l2 --without-vulkan \
