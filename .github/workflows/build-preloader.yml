@@ -1,0 +1,148 @@
+name: Build wine-preloader (experimental)
+
+# Builds wine-preloader from upstream Wine source on macOS, with the preloader
+# explicitly enabled. Gcenx's Wine builds ship neither the preloader binary
+# nor a wine with WINE_RESERVE segments embedded, so the 0x1000-0x1FFFFFFFF
+# region is unreserved at process load on Apple Silicon. That's the SWG
+# Legends mmap failure root cause. Producing the preloader is the smallest
+# patch that fixes it.
+#
+# This workflow is intentionally standalone right now so we can iterate the
+# build before wiring it into engine-bundle.yml. Once green, the artifact
+# (wine-preloader binary) gets consumed by engine-bundle.yml and placed at
+# Engine/bin/wine-preloader.
+#
+# Outputs an artifact: wine-preloader-<tag>.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Wine source tag (e.g. wine-11.9). Should match the Gcenx tarball version we use at runtime.'
+        required: true
+        default: 'wine-11.9'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      WINE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcode-select -p
+          clang --version
+          ld -v 2>&1 || true
+
+      - name: Install build deps
+        run: |
+          # Minimum deps. Almost everything else is disabled via --without-* below.
+          brew install bison pkg-config
+
+      - name: Clone Wine source
+        run: |
+          set -euo pipefail
+          # Wine source mirror on GitHub is fast and clones cleanly without auth.
+          git clone --depth=1 --branch "${WINE_TAG}" \
+            https://github.com/wine-mirror/wine.git /tmp/wine-src
+          cd /tmp/wine-src
+          head -1 VERSION
+          ls loader/preloader_mac.c loader/preloader.c
+          ls loader/Makefile.in
+
+      - name: Force preloader build on darwin x86_64
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          # configure.ac decides on darwin x86_64 whether to use the preloader
+          # via a WINE_TRY_CFLAGS([-Wl,-no_huge]) probe. If -no_huge is supported
+          # (Xcode 15.3+), it picks the segments-in-wine path and skips building
+          # the preloader. We want the preloader specifically.
+          # Replace -Wl,-no_huge with a guaranteed-fail flag so the else-branch
+          # (wine_use_preloader=yes) is taken on x86_64.
+          python3 -c "
+          import re, sys
+          p = '/tmp/wine-src/configure.ac'
+          with open(p) as f: s = f.read()
+          pat = r'WINE_TRY_CFLAGS\(\[-Wl,-no_huge\]'
+          new = 'WINE_TRY_CFLAGS([-Wl,-crosswire-force-preloader-fallback]'
+          n = len(re.findall(pat, s))
+          if n != 1:
+              print(f'ERROR: expected 1 match for {pat}, got {n}', file=sys.stderr)
+              sys.exit(1)
+          s = re.sub(pat, new, s)
+          with open(p, 'w') as f: f.write(s)
+          print('Patched configure.ac: forced preloader path on darwin x86_64')
+          "
+          # Regenerate configure from the patched configure.ac. autoreconf needs autoconf.
+          brew list autoconf >/dev/null 2>&1 || brew install autoconf
+          autoreconf -fi 2>&1 | tail -20
+
+      - name: Configure (minimal)
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          # Disable everything we don't need so configure completes fast and
+          # without exotic deps. The preloader doesn't link against most of
+          # Wine's runtime libraries.
+          ./configure \
+            --enable-win64 \
+            --disable-tests \
+            --without-alsa --without-capi --without-coreaudio --without-cups \
+            --without-dbus --without-fontconfig --without-freetype --without-gettext \
+            --without-gphoto --without-gnutls --without-gssapi --without-gstreamer \
+            --without-inotify --without-jpeg --without-krb5 --without-mingw \
+            --without-mpg123 --without-netapi --without-openal --without-opencl \
+            --without-opengl --without-pcap --without-pcsclite --without-png \
+            --without-pulse --without-sane --without-sdl --without-tiff \
+            --without-udev --without-unwind --without-usb --without-v4l2 \
+            --without-vkd3d --without-vulkan --without-x --without-xattr \
+            --without-xcomposite --without-xcursor --without-xfixes \
+            --without-xinerama --without-xinput --without-xinput2 \
+            --without-xrandr --without-xrender --without-xshape --without-xshm \
+            --without-xxf86vm 2>&1 | tail -40
+          echo "--- WINELOADER_PROGRAMS in config.status ---"
+          grep -E "WINELOADER_PROGRAMS|wine_use_preloader|HAVE_WINE_PRELOADER" config.status config.log 2>&1 \
+            | head -10
+
+      - name: Build wine-preloader only
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          # Build just the loader target. Saves ~30+ minutes vs a full wine build.
+          make -j2 loader/wine-preloader 2>&1 | tail -40
+
+      - name: Inspect the binary
+        run: |
+          set -euo pipefail
+          BIN=/tmp/wine-src/loader/wine-preloader
+          ls -la "$BIN"
+          file "$BIN"
+          echo "--- segments ---"
+          otool -l "$BIN" | grep -E "segname|cmd LC_SEGMENT|vmaddr|vmsize" | head -40
+          echo "--- WINE_RESERVE/WINE_TOP_DOWN check ---"
+          if otool -l "$BIN" | grep -q WINE_RESERVE; then
+            echo "SUCCESS: WINE_RESERVE segment present"
+            otool -l "$BIN" | grep -B 1 -A 4 WINE_RESERVE
+          else
+            echo "ERROR: WINE_RESERVE segment missing"
+            exit 1
+          fi
+
+      - name: Ad-hoc sign
+        run: |
+          codesign --force --sign - /tmp/wine-src/loader/wine-preloader
+          codesign -dvv /tmp/wine-src/loader/wine-preloader 2>&1 | head
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wine-preloader-${{ inputs.tag }}
+          path: /tmp/wine-src/loader/wine-preloader
+          if-no-files-found: error
+          retention-days: 14
