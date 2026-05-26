@@ -1,11 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0"
-    xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
-    xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Crosswire</title>
         <link>https://github.com/grubwire/Crosswire</link>
         <description>Crosswire changelog</description>
         <language>en</language>
+        <item>
+            <title>Version 1.1.1</title>
+            <pubDate>Tue, 26 May 2026 04:16:40 GMT</pubDate>
+            <sparkle:version>52</sparkle:version>
+            <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:releaseNotesLink>https://github.com/grubwire/crosswire/releases/tag/v1.1.1</sparkle:releaseNotesLink>
+            <enclosure url="https://data.grubwire.io/app/Crosswire-v1.1.1.dmg" sparkle:edSignature="Nc5IWw98SB+wuR1QzYwqpoWmLrcL0GglZ6zOaFp/vxpFDwkNafy4CZQaivCI8d1aUHqiZ5oVOFvLDCs6OpAPCw==" length="4609491" type="application/octet-stream" />
+        </item>
     </channel>
 </rss>
