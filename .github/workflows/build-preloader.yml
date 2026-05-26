@@ -87,6 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           cd /tmp/wine-src
+          # Homebrew bison is keg-only on macOS; prepend it so ./configure sees it.
+          export PATH="$(brew --prefix bison)/bin:$PATH"
           # Disable everything we don't need so configure completes fast and
           # without exotic deps. The preloader doesn't link against most of
           # Wine's runtime libraries.
