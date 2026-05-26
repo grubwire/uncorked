@@ -56,18 +56,56 @@ extension ContentView {
         let bottle = await waitForBottle(url: newBottleURL)
         guard let bottle else {
             provisioningMessage = nil
+            showInstallAlert(
+                title: "Could not create bottle",
+                body: "Crosswire was unable to initialize a new wineprefix for \(bottleName). "
+                    + "This is usually a Wine engine problem (memory mapping or a missing binary). "
+                    + "See the latest log at ~/Library/Logs/app.Crosswire.Crosswire/."
+            )
             return
         }
 
         provisioningMessage = "Running installer..."
         NSApp.miniaturizeAll(nil)
+        var installerError: Error?
         do {
             try await Wine.runProgram(at: pickedURL, bottle: bottle)
         } catch {
+            installerError = error
             print("Failed to run installer: \(error)")
         }
         bottle.finalizeAppIdentity()
         provisioningMessage = nil
+
+        if let installerError {
+            showInstallAlert(
+                title: "Installer could not start",
+                body: "\(installerError.localizedDescription)\n\n"
+                    + "The bottle was created but the installer never ran. "
+                    + "See the latest log at ~/Library/Logs/app.Crosswire.Crosswire/."
+            )
+            return
+        }
+
+        if bottle.userVisiblePrograms.isEmpty {
+            showInstallAlert(
+                title: "Installer finished but no apps were detected",
+                body: "The installer ran, but Crosswire could not find anything to launch. "
+                    + "On Apple Silicon this most often means the installer crashed mid-install "
+                    + "(look for mmap errors in the log). "
+                    + "Log: ~/Library/Logs/app.Crosswire.Crosswire/. "
+                    + "You can delete the bottle from its settings panel."
+            )
+        }
+    }
+
+    private func showInstallAlert(title: String, body: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = body
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @MainActor

@@ -212,6 +212,26 @@ extension Bottle {
         return patterns.contains { lower.contains($0) }
     }
 
+    /// Subpaths of every wineprefix that hold Wine's own bundled apps
+    /// (Internet Explorer, Windows Media Player, etc). Anything under
+    /// these is not user-installed content and must never be chosen as a
+    /// bottle's primary launchable app, even when the real installer
+    /// left nothing behind.
+    private static let stockWineProgramSubpaths: [String] = [
+        "/Program Files/Internet Explorer/",
+        "/Program Files/Windows Media Player/",
+        "/Program Files/Windows NT/",
+        "/Program Files/Common Files/",
+        "/Program Files (x86)/Internet Explorer/",
+        "/Program Files (x86)/Windows Media Player/",
+        "/Program Files (x86)/Windows NT/",
+        "/Program Files (x86)/Common Files/"
+    ]
+
+    private static func isStockWineApp(_ url: URL) -> Bool {
+        stockWineProgramSubpaths.contains { url.path.contains($0) }
+    }
+
     /// Run after an install completes. Picks the app's display name and
     /// primary launcher from Start Menu entries (or falls back to a
     /// filtered Program Files sweep when the installer left no shortcuts).
@@ -230,15 +250,27 @@ extension Bottle {
         }
 
         // No Start Menu entries. Fall back to filtering Program Files,
-        // skipping uninstallers/updaters/etc. Used for installers that
-        // never created shortcuts and for portable .exes.
+        // skipping uninstallers, updaters, and Wine's own bundled apps
+        // (iexplore.exe etc). Used for installers that never created
+        // shortcuts and for portable .exes.
         updateInstalledPrograms()
         let visible = programs
             .map(\.url)
-            .filter { !Bottle.isNoiseEntryName($0.deletingPathExtension().lastPathComponent) }
+            .filter { url in
+                if Bottle.isNoiseEntryName(url.deletingPathExtension().lastPathComponent) {
+                    return false
+                }
+                return !Bottle.isStockWineApp(url)
+            }
 
         guard !visible.isEmpty else {
+            // Nothing the user can plausibly launch was found. Clear
+            // any stale primary pointer so the row stays empty rather
+            // than launching a Wine built-in by mistake.
             settings.userVisibleProgramURLs = []
+            if let primary = settings.primaryProgramURL, Bottle.isStockWineApp(primary) {
+                settings.primaryProgramURL = nil
+            }
             return
         }
 
