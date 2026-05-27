@@ -11,36 +11,33 @@
 # because we build the existing patched tree, not a fresh clone.
 #
 # Prerequisites (verified by check_prereqs):
-#   brew install bison mingw-w64 vulkan-headers vulkan-loader
+#   brew install bison mingw-w64
+#   LunarG Vulkan SDK installed at $VULKAN_SDK_ROOT (default ~/VulkanSDK/1.4.350.0)
 #   /tmp/wine-build/wine-src is the patched 11.9 tree
 #
-# *** KNOWN BLOCKER ON APPLE SILICON ***
+# *** VULKAN SDK SOURCE ***
 # Homebrew's vulkan-loader on Apple Silicon ships an arm64-only
-# libvulkan.dylib. The existing Crosswire engine is x86_64 (running under
-# Rosetta), so configure with `--host=x86_64-apple-darwin` fails to link
-# against the arm64 brew libvulkan. Two paths forward, pick one before
-# running this script:
+# libvulkan.dylib, which cannot link an x86_64 Wine. Crosswire's engine
+# runs under Rosetta (x86_64-apple-darwin), so we use the LunarG Vulkan
+# SDK for macOS instead — it ships a universal (arm64 + x86_64)
+# libvulkan.dylib plus MoltenVK.
 #
-#   (A) Install the LunarG Vulkan SDK for macOS, which ships a universal
-#       (arm64 + x86_64) libvulkan.dylib and MoltenVK.
+# Download:
+#   https://sdk.lunarg.com/sdk/download/latest/mac/vulkan-sdk.dmg
+#   (~376 MB ZIP containing the installer; confirmed 2026-05-27)
 #
-#       Download:
-#         https://sdk.lunarg.com/sdk/download/latest/mac/vulkan-sdk.dmg
-#         (despite the .dmg extension, it's a ~376 MB ZIP containing the
-#         installer + tarball — confirmed 2026-05-27)
+# Install to ~/VulkanSDK/<version>/. This script sources
+# <version>/setup-env.sh to set VULKAN_SDK, PATH, PKG_CONFIG_PATH, etc.
+# Override the SDK version via VULKAN_SDK_ROOT if you've installed a
+# different release.
 #
-#       Install location is typically ~/VulkanSDK/<version>/macOS/. Once
-#       installed, prepend that to PKG_CONFIG_PATH and PATH at the top of
-#       configure_step() below — or `source setup-env.sh` from the SDK's
-#       macOS/ subdir, which sets everything for you.
+# Note: Wine's configure does not honour PKG_CONFIG_PATH for -lvulkan;
+# it uses AC_CHECK_LIB, which needs CPPFLAGS/-I and LDFLAGS/-L to find
+# the SDK's headers and dylibs. configure_step() sets both.
 #
-#   (B) Pivot the entire engine to arm64-native, which removes the Rosetta
-#       step. Needs llvm-mingw (brew install llvm-mingw) for PE
-#       cross-compilation, and a from-scratch rebuild of every Mach-O .so
-#       in dlls/ — not a 2-hour job.
-#
-# Until one of those is done this script's configure_step will fail with
-# "libvulkan and libMoltenVK 64-bit development files not found."
+# Future option: pivot the engine to arm64-native, removing Rosetta.
+# That needs llvm-mingw (brew install llvm-mingw) for PE cross-compilation
+# and a from-scratch rebuild of every Mach-O .so in dlls/.
 #
 # Runtime: about 1.5–2 hours on M1/M2 for a fresh full build.
 # Safe to re-run: build dir is rebuilt from scratch each invocation.
@@ -52,10 +49,27 @@ BUILD_DIR="/tmp/wine-build/build-vulkan"
 SRC_DIR="/tmp/wine-build/wine-src"
 ENGINE_DIR="$HOME/Library/Application Support/app.Crosswire.Crosswire/Engine"
 LOG_FILE="/tmp/crosswire-overnight/vulkan-build-$(date +%Y%m%dT%H%M%S).log"
+# Override with: VULKAN_SDK_ROOT=~/VulkanSDK/X.Y.Z bash scripts/build-vulkan-engine.sh
+VULKAN_SDK_ROOT="${VULKAN_SDK_ROOT:-$HOME/VulkanSDK/1.4.350.0}"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
 log() { printf '\n=== %s ===\n' "$*" | tee -a "$LOG_FILE"; }
+
+load_vulkan_sdk() {
+    # Source the LunarG SDK's setup-env.sh. It expects PKG_CONFIG_PATH to be
+    # set (the script appends to it with `:` unconditionally); export an
+    # empty value so it doesn't pull in literal "${PKG_CONFIG_PATH}" text.
+    if [[ ! -f "$VULKAN_SDK_ROOT/setup-env.sh" ]]; then
+        echo "MISSING: $VULKAN_SDK_ROOT/setup-env.sh" >&2
+        echo "Install the LunarG Vulkan SDK to \$VULKAN_SDK_ROOT (default ~/VulkanSDK/1.4.350.0)." >&2
+        echo "Download: https://sdk.lunarg.com/sdk/download/latest/mac/vulkan-sdk.dmg" >&2
+        exit 1
+    fi
+    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}"
+    # shellcheck disable=SC1091
+    source "$VULKAN_SDK_ROOT/setup-env.sh" > /dev/null
+}
 
 check_prereqs() {
     log "Checking prerequisites"
@@ -66,9 +80,14 @@ check_prereqs() {
             missing=1
         fi
     done
-    if ! PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig" pkg-config --exists vulkan; then
-        echo "MISSING: pkg-config can't find vulkan (brew install vulkan-headers vulkan-loader)" | tee -a "$LOG_FILE"
+    load_vulkan_sdk
+    if ! pkg-config --exists vulkan; then
+        echo "MISSING: pkg-config can't find vulkan in $VULKAN_SDK/lib/pkgconfig" | tee -a "$LOG_FILE"
         missing=1
+    else
+        local vk_ver
+        vk_ver="$(pkg-config --modversion vulkan)"
+        echo "Vulkan SDK $vk_ver found at $VULKAN_SDK" | tee -a "$LOG_FILE"
     fi
     if [[ ! -d "$SRC_DIR" ]]; then
         echo "MISSING: $SRC_DIR — wine source tree not present" | tee -a "$LOG_FILE"
@@ -79,7 +98,8 @@ check_prereqs() {
         missing=1
     fi
     if (( missing > 0 )); then
-        echo "Run: brew install bison mingw-w64 vulkan-headers vulkan-loader" >&2
+        echo "Run: brew install bison mingw-w64" >&2
+        echo "And install the LunarG Vulkan SDK (see header comment)." >&2
         exit 1
     fi
     echo "All prerequisites present." | tee -a "$LOG_FILE"
@@ -90,12 +110,23 @@ configure_step() {
     # We match the host triple so the rebuilt binaries are drop-in replacements,
     # and so x86_64-w64-mingw32 (the only mingw available locally) satisfies
     # the PE cross-compilation requirement.
+    #
+    # CC/CFLAGS pin -arch x86_64 explicitly. Without it, clang on Apple
+    # Silicon resolves `-m64` to arm64 headers when the target SDK exposes
+    # both arches, and the i386/arm64 _OSSwapInt16 helpers collide during
+    # the tools/makedep host build.
+    #
+    # CPPFLAGS/LDFLAGS point at the LunarG SDK because Wine's AC_CHECK_LIB
+    # for vulkan/MoltenVK ignores pkg-config — it needs -I/-L directly.
     log "Configuring Wine with Vulkan (build dir: $BUILD_DIR)"
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
     PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/mingw-w64/bin:/opt/homebrew/bin:$PATH" \
-    PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig" \
+    CC="clang -arch x86_64 -m64" \
+    CFLAGS="-arch x86_64 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" \
+    CPPFLAGS="-I$VULKAN_SDK/include" \
+    LDFLAGS="-L$VULKAN_SDK/lib" \
         "$SRC_DIR/configure" \
             --host=x86_64-apple-darwin \
             --enable-win64 \
@@ -114,7 +145,6 @@ build_step() {
     log "Building Wine (this is the slow step: ~1.5–2 hours)"
     cd "$BUILD_DIR"
     PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/mingw-w64/bin:/opt/homebrew/bin:$PATH" \
-    PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig" \
         make -j"$(sysctl -n hw.ncpu)" 2>&1 | tee -a "$LOG_FILE"
 }
 
@@ -141,23 +171,28 @@ swap_step() {
     log "Swapping rebuilt binaries into engine (backups end .pre-vulkan)"
     cd "$BUILD_DIR"
 
-    # Back up the existing wine64 + wineserver before clobbering.
-    for original in "$ENGINE_DIR/bin/wine64" "$ENGINE_DIR/bin/wineserver"; do
-        if [[ -f "$original" && ! -f "$original.pre-vulkan" ]]; then
-            cp "$original" "$original.pre-vulkan"
-            echo "  backed up: $original.pre-vulkan" | tee -a "$LOG_FILE"
+    # The engine uses the unified `wine` loader (not `wine64`); the
+    # Crosswire64 wrapper just execs ./wine. Modern Wine builds with
+    # --enable-win64 still produce a binary called `wine64` in the build
+    # dir, which is our drop-in replacement for the engine's `wine`.
+    # Back up before clobbering, but only if no backup exists yet.
+    declare -A SWAPS=(
+        ["wine64"]="$ENGINE_DIR/bin/wine"
+        ["server/wineserver"]="$ENGINE_DIR/bin/wineserver"
+    )
+    for src in "${!SWAPS[@]}"; do
+        local dst="${SWAPS[$src]}"
+        if [[ ! -f "$src" ]]; then
+            echo "  WARNING: built artifact $src not found, skipping" | tee -a "$LOG_FILE"
+            continue
         fi
+        if [[ -f "$dst" && ! -f "$dst.pre-vulkan" ]]; then
+            cp "$dst" "$dst.pre-vulkan"
+            echo "  backed up: $dst.pre-vulkan" | tee -a "$LOG_FILE"
+        fi
+        cp -f "$src" "$dst"
+        echo "  installed: $dst" | tee -a "$LOG_FILE"
     done
-
-    # Copy new wine64 and wineserver in place.
-    if [[ -f "wine64" ]]; then
-        cp -f "wine64" "$ENGINE_DIR/bin/wine64"
-        echo "  installed: $ENGINE_DIR/bin/wine64" | tee -a "$LOG_FILE"
-    fi
-    if [[ -f "server/wineserver" ]]; then
-        cp -f "server/wineserver" "$ENGINE_DIR/bin/wineserver"
-        echo "  installed: $ENGINE_DIR/bin/wineserver" | tee -a "$LOG_FILE"
-    fi
 
     # winevulkan PE DLL (the new piece that DXVK depends on).
     local winevulkan="dlls/winevulkan/winevulkan.dll"
@@ -165,6 +200,7 @@ swap_step() {
         local target="$ENGINE_DIR/lib/wine/x86_64-windows/winevulkan.dll"
         if [[ -f "$target" && ! -f "$target.pre-vulkan" ]]; then
             cp "$target" "$target.pre-vulkan"
+            echo "  backed up: $target.pre-vulkan" | tee -a "$LOG_FILE"
         fi
         cp -f "$winevulkan" "$target"
         echo "  installed: $target" | tee -a "$LOG_FILE"
