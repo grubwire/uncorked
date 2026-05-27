@@ -22,9 +22,17 @@
 # running this script:
 #
 #   (A) Install the LunarG Vulkan SDK for macOS, which ships a universal
-#       (arm64 + x86_64) libvulkan.dylib and MoltenVK. Point pkg-config /
-#       linker at /usr/local/lib (or wherever the SDK installs to) before
-#       configure.
+#       (arm64 + x86_64) libvulkan.dylib and MoltenVK.
+#
+#       Download:
+#         https://sdk.lunarg.com/sdk/download/latest/mac/vulkan-sdk.dmg
+#         (despite the .dmg extension, it's a ~376 MB ZIP containing the
+#         installer + tarball — confirmed 2026-05-27)
+#
+#       Install location is typically ~/VulkanSDK/<version>/macOS/. Once
+#       installed, prepend that to PKG_CONFIG_PATH and PATH at the top of
+#       configure_step() below — or `source setup-env.sh` from the SDK's
+#       macOS/ subdir, which sets everything for you.
 #
 #   (B) Pivot the entire engine to arm64-native, which removes the Rosetta
 #       step. Needs llvm-mingw (brew install llvm-mingw) for PE
