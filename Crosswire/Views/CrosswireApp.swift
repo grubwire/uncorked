@@ -133,7 +133,7 @@ struct CrosswireApp: App {
             }
         }
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
         }
     }
 

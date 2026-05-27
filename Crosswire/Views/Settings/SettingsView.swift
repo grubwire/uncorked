@@ -17,6 +17,7 @@
 //
 
 import SwiftUI
+import Sparkle
 import CrosswireKit
 
 struct SettingsView: View {
@@ -24,6 +25,15 @@ struct SettingsView: View {
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
+
+    /// Sparkle updater. Optional so #Preview can construct the view without it;
+    /// when present, the Updates section renders an in-app Check for Updates
+    /// button next to the macOS menu-bar entry.
+    let updater: SPUUpdater?
+
+    init(updater: SPUUpdater? = nil) {
+        self.updater = updater
+    }
 
     var body: some View {
         Form {
@@ -50,11 +60,33 @@ struct SettingsView: View {
             Section("settings.updates") {
                 Toggle("settings.toggle.Crosswire.updates", isOn: $crosswireUpdate)
                 Toggle("settings.toggle.engine.updates", isOn: $checkEngineUpdates)
+                if let updater {
+                    HStack {
+                        Text("Check now")
+                        Spacer()
+                        SparkleView(updater: updater)
+                    }
+                }
+            }
+            Section("About") {
+                LabeledContent("App version", value: appVersionString)
+                LabeledContent("Engine version", value: engineVersionString)
             }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: ViewWidth.medium)
+    }
+
+    private var appVersionString: String {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        return build.isEmpty ? short : "\(short) (\(build))"
+    }
+
+    private var engineVersionString: String {
+        guard let v = CrosswireEngine.engineVersion() else { return "Not installed" }
+        return "\(v.major).\(v.minor).\(v.patch)"
     }
 }
 
