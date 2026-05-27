@@ -281,8 +281,6 @@
 		6E40494929CCA19C006E3F1B = {
 			isa = PBXGroup;
 			children = (
-				0173DF982FC6BFB50043FD8C /* crosswire-icon-1024.icon */,
-				0173DF962FC6BDE80043FD8C /* AppIcon.icon */,
 				6E40495429CCA19C006E3F1B /* Crosswire */,
 				6E70A4992A9A2197007799E9 /* CrosswireCmd */,
 				6EFDF64F2AAE2DA800EF622F /* CrosswireThumbnail */,
@@ -308,6 +306,8 @@
 		6E40495429CCA19C006E3F1B /* Crosswire */ = {
 			isa = PBXGroup;
 			children = (
+				0173DF962FC6BDE80043FD8C /* AppIcon.icon */,
+				0173DF982FC6BFB50043FD8C /* crosswire-icon-1024.icon */,
 				EEA5A2452A31DD65008274AE /* AppDelegate.swift */,
 				6365C4BF2B1AA69500AAE1FD /* Extensions */,
 				6E5197D029D7200700CF655E /* Utils */,
