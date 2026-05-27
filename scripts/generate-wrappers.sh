@@ -29,7 +29,21 @@ make_wrapper() {
     local target="$2" # target binary (e.g. wine64 or wine)
     cat > "$BIN/$name" << EOF
 #!/bin/sh
-exec "\$(dirname "\$0")/$target" "\$@"
+# Crosswire engine wrapper. Ensures the engine's bundled dylibs (FreeType,
+# etc.) are discoverable to wine and every child process it spawns.
+#
+# Why DYLD_FALLBACK_LIBRARY_PATH and not DYLD_LIBRARY_PATH:
+# wine's win32u.so calls dlopen("libfreetype.6.dylib") with a bare leaf name.
+# macOS dlopen only searches DYLD_LIBRARY_PATH + /usr/lib for bare names,
+# but DYLD_LIBRARY_PATH gets stripped across exec for restricted binaries
+# (and effectively across Rosetta and wine's preloader chain). Fallback is
+# not in dyld's strip list, so it propagates into services.exe / plugplay /
+# explorer / installer children. Without this the engine prints "Wine cannot
+# find the FreeType font library" 10x per app run and blocks any GUI wizard.
+DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+ENGINE_LIB="\$(dirname "\$DIR")/lib"
+export DYLD_FALLBACK_LIBRARY_PATH="\${ENGINE_LIB}:\${DYLD_FALLBACK_LIBRARY_PATH:-/usr/local/lib:/usr/lib}"
+exec "\$DIR/$target" "\$@"
 EOF
     chmod +x "$BIN/$name"
 }

@@ -86,6 +86,97 @@ jobs:
         if: steps.gate.outputs.needed == 'true'
         run: bash scripts/generate-wrappers.sh /tmp/engine/bin
 
+      # Apply CW HACK 20760 (WoW64 lretq thunk) to wow64cpu.dll. Gcenx ships
+      # the upstream-Wine pre-built DLL; under Rosetta 2 its ljmp-based 32->64
+      # transition crashes with "Exception frame is not in stack limits". We
+      # rebuild just wow64cpu.dll from source with the patch applied and swap
+      # it into the engine tree before signing. PE binary, not Mach-O, so the
+      # subsequent sign-engine.sh step leaves it alone (correctly).
+      #
+      # Other CW patches the local dev tree carries (CW 22131 / 24945 / 25719
+      # / 18947 / 23427 / 20186 / 24256 — all in dlls/ntdll/unix/) would need
+      # a full Wine rebuild to land. Adding those is a separate workflow
+      # overhaul; for now only the PE-side CW 20760 ships from CI.
+      - name: Install Wine cross-compile deps for CW 20760
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          # Apple's bundled bison is 2.3; Wine requires >=3.0.
+          # mingw-w64 supplies x86_64-w64-mingw32-gcc for the PE cross.
+          brew install bison pkg-config autoconf mingw-w64
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          which x86_64-w64-mingw32-gcc || ls -la "$(brew --prefix mingw-w64)/bin/" | head
+
+      - name: Clone Gcenx/wine source and apply CW 20760
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.gcenx.outputs.tag }}"
+          # Gcenx's wine fork tracks upstream tags. Try the exact tag first;
+          # fall back to master if Gcenx hasn't tagged the equivalent yet.
+          if git ls-remote --tags https://github.com/Gcenx/wine.git "wine-${TAG}" | grep -q "wine-${TAG}"; then
+            git clone --depth=1 --branch "wine-${TAG}" https://github.com/Gcenx/wine.git /tmp/wine-src
+          else
+            echo "No wine-${TAG} tag in Gcenx/wine, using master."
+            git clone --depth=1 --branch master https://github.com/Gcenx/wine.git /tmp/wine-src
+          fi
+          python3 scripts/patch-cw20760.py /tmp/wine-src
+
+      - name: Configure Wine source (PE cross only, no host deps)
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          # Cross-compile to x86_64 so the resulting PE DLL ABI-matches the
+          # x86_64 Gcenx engine (which runs under Rosetta on Apple Silicon).
+          # Disable every host-side dep — we only need the PE build chain.
+          # Keep mingw enabled so configure populates PE_ARCHS and the
+          # x86_64-windows target builds.
+          export CC="clang -arch x86_64"
+          export CXX="clang++ -arch x86_64"
+          ./configure \
+            --host=x86_64-apple-darwin \
+            --enable-win64 \
+            --disable-tests \
+            --without-alsa --without-capi --without-coreaudio --without-cups \
+            --without-dbus --without-fontconfig --without-freetype --without-gettext \
+            --without-gphoto --without-gnutls --without-gssapi --without-gstreamer \
+            --without-inotify --without-krb5 \
+            --without-netapi --without-opencl --without-opengl --without-pcap \
+            --without-pcsclite --without-pulse --without-sane --without-sdl \
+            --without-udev --without-usb --without-v4l2 --without-vulkan \
+            --without-x --without-xcomposite --without-xcursor --without-xfixes \
+            --without-xinerama --without-xinput --without-xinput2 \
+            --without-xrandr --without-xrender --without-xshape --without-xshm \
+            --without-xxf86vm 2>&1 | tail -30
+
+      - name: Build patched wow64cpu.dll
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          make -j2 dlls/wow64cpu/x86_64-windows/wow64cpu.dll 2>&1 | tail -20
+          ls -la dlls/wow64cpu/x86_64-windows/wow64cpu.dll
+          file dlls/wow64cpu/x86_64-windows/wow64cpu.dll
+
+      - name: Swap patched wow64cpu.dll into engine
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          TARGET=/tmp/engine/lib/wine/x86_64-windows/wow64cpu.dll
+          if [ ! -f "$TARGET" ]; then
+            echo "::error::Engine tree is missing $TARGET — Gcenx archive layout changed?"
+            exit 1
+          fi
+          # Stash the Gcenx original as a backup the same way the local dev
+          # engine carries .gcenx.bak files, so the patch is auditable
+          # in-place.
+          cp "$TARGET" "${TARGET}.gcenx.bak"
+          cp /tmp/wine-src/dlls/wow64cpu/x86_64-windows/wow64cpu.dll "$TARGET"
+          echo "Replaced wow64cpu.dll (CW 20760 patched):"
+          shasum -a 256 "$TARGET" "${TARGET}.gcenx.bak"
+          # Drop the source tree to save disk for subsequent steps.
+          rm -rf /tmp/wine-src
+
       - name: Sign all Mach-O files
         if: steps.gate.outputs.needed == 'true'
         env:
