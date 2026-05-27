@@ -151,9 +151,13 @@ struct ContentView: View {
     }
 
     private var noMatchState: some View {
-        VStack {
+        VStack(spacing: 10) {
             Spacer()
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.tertiary)
             Text("No apps match \"\(searchText)\"")
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -185,23 +189,41 @@ struct ContentView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             Spacer()
-            Text("Drop a Windows .exe to get started")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.10))
+                    .frame(width: 96, height: 96)
+                Image(systemName: "app.badge.checkmark")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+            }
+            VStack(spacing: 6) {
+                Text("No apps yet")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("Install a Windows installer (.exe or .msi) to get started.\nCrosswire handles the rest.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
             Button(action: installWindowsApp) {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                     Text("Install Windows App")
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.top, 4)
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 32)
     }
 
     // MARK: - Derived

@@ -62,18 +62,42 @@ func initialsForProgramName(_ name: String) -> String {
 }
 
 /// Square tile with the bottle's color and initials, sized 42x42 by default.
+/// Uses a vertical gradient + inner light bevel so the tile reads as a real
+/// surface rather than a flat color swatch.
 struct AppTileIcon: View {
     let name: String
     var side: CGFloat = 42
 
+    private var base: Color { colorForProgramName(name) }
+    private var cornerRadius: CGFloat { max(6, side * 0.20) }
+
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(colorForProgramName(name))
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [base.opacity(1.0), base.opacity(0.78)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            // Inner top highlight — reads as light catching the surface
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.22), lineWidth: 0.75)
+                .blendMode(.plusLighter)
+                .mask(
+                    LinearGradient(
+                        colors: [.white, .clear],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                )
             Text(initialsForProgramName(name))
-                .font(.system(size: side * 0.38, weight: .semibold))
+                .font(.system(size: side * 0.38, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
         }
         .frame(width: side, height: side)
+        .shadow(color: base.opacity(0.35), radius: side * 0.06, x: 0, y: side * 0.04)
     }
 }

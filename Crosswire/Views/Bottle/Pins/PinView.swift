@@ -19,6 +19,9 @@
 import SwiftUI
 import CrosswireKit
 
+/// A pinned-program tile in the bottle library grid. Single-click runs it
+/// (matches Finder/Launchpad expectations for app tiles); context menu
+/// exposes everything else.
 struct PinView: View {
     @ObservedObject var bottle: Bottle
     @ObservedObject var program: Program
@@ -29,42 +32,33 @@ struct PinView: View {
     @State private var showRenameSheet = false
     @State private var name: String = ""
     @State private var opening: Bool = false
+    @State private var hovered: Bool = false
+
+    private let tileSide: CGFloat = 64
 
     var body: some View {
-        VStack {
-            Group {
-                if let image = image {
-                    image
-                        .resizable()
-                } else {
-                    Image(systemName: "app.dashed")
-                        .resizable()
-                }
-            }
-            .frame(width: 45, height: 45)
-            .scaleEffect(opening ? 2 : 1)
-            .opacity(opening ? 0 : 1)
-            Spacer()
+        VStack(spacing: 10) {
+            iconBlock
             Text(name)
+                .font(.system(size: 11, weight: .medium))
                 .multilineTextAlignment(.center)
                 .lineLimit(2, reservesSpace: true)
+                .foregroundStyle(.primary)
         }
-        .frame(width: 90, height: 90)
-        .padding(10)
-        .overlay {
-            HStack {
-                Spacer()
-                Image(systemName: "play.fill")
-                    .resizable()
-                    .foregroundColor(.green)
-                    .frame(width: 16, height: 16)
-            }
-            .frame(width: 45, height: 45)
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 0))
-        }
+        .frame(width: 96)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(hovered ? Color.primary.opacity(0.06) : Color.clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .animation(.easeInOut(duration: 0.14), value: hovered)
+        .onHover { hovered = $0 }
+        .onTapGesture { runProgram() }
         .contextMenu {
             ProgramMenuView(program: program, path: $path)
-
+            Divider()
             Button("button.rename", systemImage: "pencil.line") {
                 showRenameSheet.toggle()
             }
@@ -73,9 +67,6 @@ struct PinView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([program.url])
             }
             .labelStyle(.titleAndIcon)
-        }
-        .onTapGesture(count: 2) {
-            runProgram()
         }
         .sheet(isPresented: $showRenameSheet) {
             RenameView("rename.pin.title", name: name) { newName in
@@ -101,15 +92,46 @@ struct PinView: View {
         }
     }
 
+    @ViewBuilder
+    private var iconBlock: some View {
+        ZStack {
+            if let image = image {
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: tileSide, height: tileSide)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                AppTileIcon(name: name.isEmpty ? pin.name : name, side: tileSide)
+            }
+            // Press-feedback: subtle scale-and-fade out at run time
+        }
+        .scaleEffect(opening ? 0.92 : (hovered ? 1.02 : 1.0))
+        .opacity(opening ? 0.0 : 1.0)
+        .overlay(alignment: .bottomTrailing) {
+            if hovered {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(Color.accentColor))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
+                    .offset(x: 4, y: 4)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovered)
+    }
+
     func runProgram() {
-        withAnimation(.easeIn(duration: 0.25)) {
+        withAnimation(.easeIn(duration: 0.18)) {
             opening = true
         } completion: {
-            withAnimation(.easeOut(duration: 0.1)) {
+            withAnimation(.easeOut(duration: 0.12)) {
                 opening = false
             }
         }
-
         program.run()
     }
 }
