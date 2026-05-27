@@ -22,6 +22,7 @@ import os.log
 // swiftlint:disable file_length
 
 @MainActor
+// swiftlint:disable:next type_body_length
 public class Wine {
     /// URL to the installed `DXVK` folder
     private nonisolated static let dxvkFolder: URL = CrosswireEngine.libraryFolder.appending(path: "DXVK")
@@ -102,9 +103,14 @@ public class Wine {
     /// Execute a `wine start /unix {url}` command returning the output result.
     /// Per-program plist (Program Settings/<exe>.plist) env / locale / args are auto-merged.
     /// Caller-supplied `environment` keys and non-empty `args` override the plist.
+    ///
+    /// Returns a `ProgramRunReport` describing the exit. Also posts
+    /// `.crosswireProgramDidExit` on `NotificationCenter.default` so the
+    /// app's `FailureWatcher` can surface a dialog on abnormal exits.
+    @discardableResult
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
-    ) async throws {
+    ) async throws -> ProgramRunReport {
         var finalEnv = environment
         var finalArgs = args
         if let settings = loadProgramSettings(for: url, in: bottle) {
@@ -123,11 +129,60 @@ public class Wine {
             try enableDXVK(bottle: bottle)
         }
 
-        for await _ in try Self.runWineProcess(
+        let startedAt = Date()
+        var exitCode: Int32 = 0
+        var logURL: URL?
+        for await output in try Self.runWineProcess(
             name: url.lastPathComponent,
             args: ["start", "/unix", url.path(percentEncoded: false)] + finalArgs,
             bottle: bottle, environment: finalEnv
-        ) { }
+        ) {
+            switch output {
+            case .terminated(let process):
+                exitCode = process.terminationStatus
+            case .started:
+                if logURL == nil { logURL = latestRunLogURL() }
+            case .message, .error:
+                break
+            }
+        }
+
+        let report = ProgramRunReport(
+            executableURL: url,
+            bottleURL: bottle.url,
+            bottleDisplayName: bottle.settings.name,
+            exitCode: exitCode,
+            duration: Date().timeIntervalSince(startedAt),
+            logFileURL: logURL ?? latestRunLogURL()
+        )
+        NotificationCenter.default.post(name: .crosswireProgramDidExit, object: report)
+        return report
+    }
+
+    /// Best-effort lookup of the run log file `runWineProcess` just opened.
+    /// `makeFileHandle()` (in Extensions) writes to
+    /// `~/Library/Logs/app.Crosswire.Crosswire/<timestamp>.log`; the most
+    /// recent file is overwhelmingly likely to be the one for this run.
+    private static func latestRunLogURL() -> URL? {
+        let logDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first?
+            .appending(path: "Logs")
+            .appending(path: "app.Crosswire.Crosswire")
+        guard let logDir,
+              let entries = try? FileManager.default.contentsOfDirectory(
+                at: logDir,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+              )
+        else { return nil }
+        return entries
+            .filter { $0.pathExtension == "log" }
+            .max { lhs, rhs in
+                let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate) ?? .distantPast
+                let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate) ?? .distantPast
+                return lhsDate < rhsDate
+            }
     }
 
     /// Load the per-program plist for an exe inside a bottle, if one exists on disk.

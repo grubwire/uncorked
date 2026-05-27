@@ -27,6 +27,7 @@ struct CrosswireApp: App {
     @State var showSetup: Bool = false
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openURL) var openURL
+    @StateObject private var failureWatcher = FailureWatcher()
     private let updaterController: SPUStandardUpdaterController
 
     init() {
