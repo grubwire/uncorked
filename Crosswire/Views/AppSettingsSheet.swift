@@ -116,31 +116,39 @@ struct AppSettingsSheet: View {
 
     @ViewBuilder
     private var advancedContent: some View {
+        sectionLabel("Configuration")
+        LabeledContent("Windows version") {
+            Picker("", selection: $bottle.settings.windowsVersion) {
+                ForEach(WinVersion.allCases.reversed(), id: \.self) {
+                    Text($0.pretty()).tag($0)
+                }
+            }
+            .labelsHidden()
+        }
+        Toggle("DXVK (DirectX to Vulkan)", isOn: $bottle.settings.dxvk)
         LabeledContent("Installed at") {
             Text(bottle.url.prettyPath())
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .lineLimit(2)
                 .truncationMode(.middle)
         }
-        Picker("Windows version", selection: $bottle.settings.windowsVersion) {
-            ForEach(WinVersion.allCases.reversed(), id: \.self) {
-                Text($0.pretty()).tag($0)
+
+        sectionLabel("Apps")
+        LabeledContent("Primary launcher") {
+            Picker("", selection: $primarySelection) {
+                Text("None").tag(URL?.none)
+                ForEach(bottle.programs) { program in
+                    Text(program.name.replacingOccurrences(of: ".exe", with: ""))
+                        .tag(Optional(program.url))
+                }
+            }
+            .labelsHidden()
+            .onChange(of: primarySelection) { _, newValue in
+                bottle.settings.primaryProgramURL = newValue
             }
         }
-        Toggle("DXVK (DirectX to Vulkan)", isOn: $bottle.settings.dxvk)
-
-        Picker("Primary launcher", selection: $primarySelection) {
-            Text("None").tag(URL?.none)
-            ForEach(bottle.programs) { program in
-                Text(program.name.replacingOccurrences(of: ".exe", with: ""))
-                    .tag(Optional(program.url))
-            }
-        }
-        .onChange(of: primarySelection) { _, newValue in
-            bottle.settings.primaryProgramURL = newValue
-        }
-
         if !bottle.programs.isEmpty {
             DisclosureGroup("All installed programs (\(bottle.programs.count))") {
                 ForEach(bottle.programs) { program in
@@ -151,33 +159,64 @@ struct AppSettingsSheet: View {
                         Spacer()
                         Button("Run") { runProgram(program) }
                             .buttonStyle(.borderless)
+                            .controlSize(.small)
                     }
                 }
             }
         }
 
-        Button {
+        sectionLabel("Maintenance")
+        actionRow(systemImage: "shippingbox",
+                  title: "Install common runtimes…",
+                  help: "Adds Microsoft fonts, Visual C++, .NET, and DirectX to this app's environment") {
             showRuntimesSheet = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "shippingbox")
-                Text("Install common runtimes…")
-            }
         }
-        .help("Adds Microsoft fonts, Visual C++, .NET, and DirectX to this app's environment")
-
-        Button("Rescan installed programs") {
+        actionRow(systemImage: "arrow.clockwise",
+                  title: "Rescan installed programs") {
             bottle.finalizeAppIdentity()
         }
-        Button("Open in Finder") {
+        actionRow(systemImage: "folder",
+                  title: "Open in Finder") {
             NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
         }
-        Button("Open Terminal") {
+        actionRow(systemImage: "terminal",
+                  title: "Open Terminal") {
             bottle.openTerminal()
         }
-        Button("Run a .exe inside this app...") {
+        actionRow(systemImage: "play.square",
+                  title: "Run a .exe inside this app…") {
             pickAdHocExecutable()
         }
+    }
+
+    @ViewBuilder
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .textCase(.uppercase)
+            .tracking(0.7)
+            .foregroundStyle(.secondary)
+            .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private func actionRow(
+        systemImage: String, title: String, help: String? = nil, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help ?? title)
     }
 
     private var resolvedPrimaryProgram: Program? {
