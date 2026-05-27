@@ -44,7 +44,7 @@ extension Crosswire {
         static let configuration = CommandConfiguration(abstract: "List existing bottles.")
 
         mutating func run() throws {
-            try MainActor.assumeIsolated {
+            MainActor.assumeIsolated {
                 var bottlesList = BottleData()
                 let bottles = bottlesList.loadBottles()
 

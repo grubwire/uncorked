@@ -85,8 +85,8 @@ struct SettingsView: View {
     }
 
     private var engineVersionString: String {
-        guard let v = CrosswireEngine.engineVersion() else { return "Not installed" }
-        return "\(v.major).\(v.minor).\(v.patch)"
+        guard let version = CrosswireEngine.engineVersion() else { return "Not installed" }
+        return "\(version.major).\(version.minor).\(version.patch)"
     }
 }
 

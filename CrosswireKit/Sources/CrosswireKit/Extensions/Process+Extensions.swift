@@ -44,14 +44,8 @@ public extension Process {
 
         return AsyncStream<ProcessOutput> { continuation in
             continuation.onTermination = { termination in
-                switch termination {
-                case .finished:
-                    break
-                case .cancelled:
-                    guard self.isRunning else { return }
+                if case .cancelled = termination, self.isRunning {
                     self.terminate()
-                @unknown default:
-                    break
                 }
             }
 
@@ -86,45 +80,62 @@ public extension Process {
             }
 
             terminationHandler = { (process: Process) in
-                // Drain anything still in the pipes at termination and route
-                // it through the same line splitter — previously this data
-                // was read with `_ = readToEnd()` and DISCARDED, which is
-                // why long runs truncated at whatever was already drained.
-                pipe.fileHandleForReading.readabilityHandler = nil
-                errorPipe.fileHandleForReading.readabilityHandler = nil
-                do {
-                    if let tail = try pipe.fileHandleForReading.readToEnd(), !tail.isEmpty {
-                        stdoutCarry.feed(tail) { line in
-                            continuation.yield(.message(line))
-                            Logger.wineKit.info("\(line, privacy: .public)")
-                            fileHandle?.write(line: line + "\n")
-                        }
-                    }
-                    if let tail = try errorPipe.fileHandleForReading.readToEnd(), !tail.isEmpty {
-                        stderrCarry.feed(tail) { line in
-                            continuation.yield(.error(line))
-                            Logger.wineKit.warning("\(line, privacy: .public)")
-                            fileHandle?.write(line: line + "\n")
-                        }
-                    }
-                    // Flush any final non-newline-terminated content.
-                    if let last = stdoutCarry.flush() {
-                        continuation.yield(.message(last))
-                        fileHandle?.write(line: last + "\n")
-                    }
-                    if let last = stderrCarry.flush() {
-                        continuation.yield(.error(last))
-                        fileHandle?.write(line: last + "\n")
-                    }
-                    try fileHandle?.close()
-                } catch {
-                    Logger.wineKit.error("Error draining pipes at termination: \(error)")
-                }
-
+                Self.drainPipesAtTermination(
+                    pipe: pipe,
+                    errorPipe: errorPipe,
+                    stdoutCarry: stdoutCarry,
+                    stderrCarry: stderrCarry,
+                    fileHandle: fileHandle,
+                    continuation: continuation
+                )
                 process.logTermination(name: name)
                 continuation.yield(.terminated(process))
                 continuation.finish()
             }
+        }
+    }
+
+    /// Drain anything still in the pipes at termination and route it through
+    /// the same line splitter — previously this data was read with
+    /// `_ = readToEnd()` and DISCARDED, which is why long runs truncated at
+    /// whatever was already drained.
+    private static func drainPipesAtTermination(
+        pipe: Pipe,
+        errorPipe: Pipe,
+        stdoutCarry: LineBuffer,
+        stderrCarry: LineBuffer,
+        fileHandle: FileHandle?,
+        continuation: AsyncStream<ProcessOutput>.Continuation
+    ) {
+        pipe.fileHandleForReading.readabilityHandler = nil
+        errorPipe.fileHandleForReading.readabilityHandler = nil
+        do {
+            if let tail = try pipe.fileHandleForReading.readToEnd(), !tail.isEmpty {
+                stdoutCarry.feed(tail) { line in
+                    continuation.yield(.message(line))
+                    Logger.wineKit.info("\(line, privacy: .public)")
+                    fileHandle?.write(line: line + "\n")
+                }
+            }
+            if let tail = try errorPipe.fileHandleForReading.readToEnd(), !tail.isEmpty {
+                stderrCarry.feed(tail) { line in
+                    continuation.yield(.error(line))
+                    Logger.wineKit.warning("\(line, privacy: .public)")
+                    fileHandle?.write(line: line + "\n")
+                }
+            }
+            // Flush any final non-newline-terminated content.
+            if let last = stdoutCarry.flush() {
+                continuation.yield(.message(last))
+                fileHandle?.write(line: last + "\n")
+            }
+            if let last = stderrCarry.flush() {
+                continuation.yield(.error(last))
+                fileHandle?.write(line: last + "\n")
+            }
+            try fileHandle?.close()
+        } catch {
+            Logger.wineKit.error("Error draining pipes at termination: \(error)")
         }
     }
 
