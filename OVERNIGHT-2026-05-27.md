@@ -187,6 +187,17 @@ Safe to `rm -rf`.
 
 ---
 
+## dev-01 (Windows Server 2025) as a debug reference
+
+You mentioned dev-01 is available. Confirmed it's reachable as
+`nick-dev-01` via SSH (10.0.0.58, Windows Server 2025 x64). It cannot
+help with the Wine engine build (Wine cross-compiles on Unix), but if
+the SWG launcher *still* renders broken after Crosswire is rebuilt with
+the env-var fix, install `SWGLegendsLauncher.exe` natively on dev-01
+to capture what a known-good launcher window should look like. That
+gives us a visual diff against the Wine render. Same trick for any
+future "is this a Wine rendering bug or an upstream app bug" question.
+
 ## First three things to do when you wake up
 
 1. **Rebuild Crosswire.app in Xcode** (any path that lands a fresh build
