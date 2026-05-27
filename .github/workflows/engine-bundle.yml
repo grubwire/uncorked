@@ -55,10 +55,12 @@ jobs:
 
       - name: Check if bundle needed
         id: gate
+        env:
+          CURRENT: ${{ steps.current.outputs.version }}
+          LATEST: ${{ steps.gcenx.outputs.tag }}
+          FORCE: ${{ inputs.force }}
         run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-          LATEST="${{ steps.gcenx.outputs.tag }}"
-          if [[ "$CURRENT" == "$LATEST" ]] && [[ "${{ inputs.force }}" != 'true' ]]; then
+          if [[ "$CURRENT" == "$LATEST" ]] && [[ "$FORCE" != 'true' ]]; then
             echo "Engine $LATEST already matches engine-version.txt. Use force=true to re-bundle."
             echo "needed=false" >> "$GITHUB_OUTPUT"
           else
