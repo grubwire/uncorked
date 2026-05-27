@@ -26,58 +26,17 @@ struct RosettaView: View {
     @Binding var showSetup: Bool
 
     var body: some View {
-        VStack {
-            Text("setup.rosetta")
-                .font(.title)
-                .fontWeight(.bold)
-            Text("setup.rosetta.subtitle")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Group {
-                if installing {
-                    ProgressView()
-                        .scaleEffect(2)
-                } else {
-                    if successful {
-                        Image(systemName: "checkmark.circle")
-                            .resizable()
-                            .foregroundStyle(.green)
-                            .frame(width: 80, height: 80)
-                    } else {
-                        VStack {
-                            Image(systemName: "xmark.circle")
-                                .resizable()
-                                .foregroundStyle(.red)
-                                .frame(width: 80, height: 80)
-                                .padding(.bottom, 20)
-                            Text("setup.rosetta.fail")
-                                .font(.subheadline)
-                        }
-                    }
-                }
-            }
-            Spacer()
-            HStack {
-                if !successful {
-                    Button("setup.quit") {
-                        exit(0)
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    Spacer()
-                    Button("setup.retry") {
-                        installing = true
-                        successful = true
-
-                        Task.detached {
-                            await checkOrInstall()
-                        }
-                    }
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
+        VStack(spacing: 0) {
+            heading
+                .padding(.top, 8)
+            Spacer(minLength: 12)
+            content
+            Spacer(minLength: 12)
+            buttonRow
         }
-        .frame(width: 400, height: 200)
+        .padding(.horizontal, 28)
+        .padding(.bottom, 8)
+        .frame(width: 420, height: 320)
         .onAppear {
             Task.detached {
                 await checkOrInstall()
@@ -85,15 +44,98 @@ struct RosettaView: View {
         }
     }
 
+    @ViewBuilder
+    private var heading: some View {
+        VStack(spacing: 6) {
+            Text("setup.rosetta")
+                .font(.system(size: 22, weight: .semibold))
+            Text("setup.rosetta.subtitle")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if installing {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.10))
+                    .frame(width: 96, height: 96)
+                ProgressView()
+                    .controlSize(.large)
+            }
+        } else if successful {
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.12))
+                    .frame(width: 96, height: 96)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 38, weight: .semibold))
+                    .foregroundStyle(Color.green)
+            }
+            .transition(.scale.combined(with: .opacity))
+        } else {
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.10))
+                        .frame(width: 72, height: 72)
+                    Image(systemName: "exclamationmark")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                Text("setup.rosetta.fail")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var buttonRow: some View {
+        HStack {
+            if !successful {
+                Button("setup.quit") {
+                    exit(0)
+                }
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("setup.retry") {
+                    installing = true
+                    successful = true
+                    Task.detached { await checkOrInstall() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+            } else {
+                Spacer()
+            }
+        }
+        .frame(height: 32)
+    }
+
     func checkOrInstall() async {
         do {
             try await RosettaCheck.ensureInstalled()
-            installing = false
+            await MainActor.run {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                    installing = false
+                }
+            }
             try await Task.sleep(for: .seconds(2))
-            proceed()
+            await proceed()
         } catch {
-            successful = false
-            installing = false
+            await MainActor.run {
+                successful = false
+                installing = false
+            }
         }
     }
 
@@ -103,7 +145,6 @@ struct RosettaView: View {
             path.append(.engineSetup)
             return
         }
-
         showSetup = false
     }
 }

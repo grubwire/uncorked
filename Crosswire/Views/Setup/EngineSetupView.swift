@@ -37,62 +37,118 @@ struct EngineSetupView: View {
     }
 
     var body: some View {
-        VStack {
-            VStack {
-                Text(phase == .downloading ? "setup.engine.download" : "setup.engine.install")
-                    .font(.title)
-                    .fontWeight(.bold)
-                Text("setup.engine.install.subtitle")
-                    .font(.subheadline)
+        VStack(spacing: 0) {
+            heading
+                .padding(.top, 8)
+            Spacer(minLength: 12)
+            stageContent
+            Spacer(minLength: 12)
+        }
+        .padding(.horizontal, 28)
+        .padding(.bottom, 16)
+        .frame(width: 420, height: 320)
+        .onAppear { startSetup() }
+    }
+
+    @ViewBuilder
+    private var heading: some View {
+        VStack(spacing: 6) {
+            Text(phase == .downloading ? "setup.engine.download" : "setup.engine.install")
+                .font(.system(size: 22, weight: .semibold))
+            Text("setup.engine.install.subtitle")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var stageContent: some View {
+        if let errorMessage {
+            errorBlock(errorMessage)
+        } else if phase == .done {
+            successHalo
+        } else if phase == .downloading && totalBytes > 0 {
+            downloadProgress
+        } else {
+            spinnerHalo
+        }
+    }
+
+    @ViewBuilder
+    private var spinnerHalo: some View {
+        ZStack {
+            Circle()
+                .fill(Color.accentColor.opacity(0.10))
+                .frame(width: 96, height: 96)
+            ProgressView()
+                .controlSize(.large)
+        }
+    }
+
+    @ViewBuilder
+    private var successHalo: some View {
+        ZStack {
+            Circle()
+                .fill(Color.green.opacity(0.12))
+                .frame(width: 96, height: 96)
+            Image(systemName: "checkmark")
+                .font(.system(size: 38, weight: .semibold))
+                .foregroundStyle(Color.green)
+        }
+        .transition(.scale.combined(with: .opacity))
+    }
+
+    @ViewBuilder
+    private func errorBlock(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.10))
+                    .frame(width: 72, height: 72)
+                Image(systemName: "exclamationmark")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+            Text(message)
+                .foregroundStyle(.primary)
+                .font(.system(size: 12))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8)
+            Button("setup.retry") {
+                self.errorMessage = nil
+                startSetup()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+    }
+
+    @ViewBuilder
+    private var downloadProgress: some View {
+        VStack(spacing: 10) {
+            ProgressView(value: Double(completedBytes), total: Double(totalBytes))
+                .progressViewStyle(.linear)
+            HStack(spacing: 6) {
+                Text(formatBytes(completedBytes))
+                    .foregroundStyle(.primary)
+                Text("/")
+                    .foregroundStyle(.tertiary)
+                Text(formatBytes(totalBytes))
                     .foregroundStyle(.secondary)
-                Spacer()
-                if let errorMessage {
-                    VStack(spacing: 8) {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                            .font(.subheadline)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Button("setup.retry") {
-                            self.errorMessage = nil
-                            startSetup()
-                        }
-                    }
-                } else if phase == .done {
-                    Image(systemName: "checkmark.circle")
-                        .resizable()
-                        .frame(width: 80, height: 80)
-                        .foregroundStyle(.green)
-                } else if phase == .downloading && totalBytes > 0 {
-                    VStack {
-                        ProgressView(value: Double(completedBytes), total: Double(totalBytes))
-                        HStack {
-                            Text(String(format: String(localized: "setup.engine.progress"),
-                                        formatBytes(completedBytes),
-                                        formatBytes(totalBytes)))
-                            + Text(" ")
-                            + (shouldShowETA() ?
-                               Text(String(format: String(localized: "setup.engine.eta"),
-                                           formatRemainingTime()))
-                               : Text(""))
-                            Spacer()
-                        }
-                        .font(.subheadline)
-                        .monospacedDigit()
-                    }
-                    .padding(.horizontal)
-                } else {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .frame(width: 80)
+                if shouldShowETA() {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(formatRemainingTime())
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            Spacer()
-        }
-        .frame(width: 400, height: 200)
-        .onAppear {
-            startSetup()
+            .font(.system(size: 11, design: .monospaced))
+            .monospacedDigit()
         }
     }
 
@@ -125,7 +181,11 @@ struct EngineSetupView: View {
 
                 await MainActor.run { phase = .verifying }
                 try await CrosswireEngine.verifyAndInstall(archive: archive, manifest: manifest)
-                await MainActor.run { phase = .done }
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                        phase = .done
+                    }
+                }
 
                 try await Task.sleep(for: .seconds(2))
                 await MainActor.run { showSetup = false }
@@ -152,8 +212,8 @@ struct EngineSetupView: View {
     private func formatRemainingTime() -> String {
         let remaining = Double(totalBytes - completedBytes) / downloadSpeed
         let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.hour, .minute, .second]
-        formatter.unitsStyle = .full
+        formatter.allowedUnits = [.minute, .second]
+        formatter.unitsStyle = .abbreviated
         return formatter.string(from: TimeInterval(remaining)) ?? ""
     }
 }

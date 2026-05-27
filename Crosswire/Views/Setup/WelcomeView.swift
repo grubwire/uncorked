@@ -28,72 +28,86 @@ struct WelcomeView: View {
     var firstTime: Bool
 
     var body: some View {
-        VStack {
-            VStack {
-                if firstTime {
-                    Text("setup.welcome")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("setup.welcome.subtitle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("setup.title")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("setup.subtitle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal)
-            Spacer()
-            Form {
+        VStack(spacing: 0) {
+            heading
+                .padding(.top, 8)
+            Spacer(minLength: 16)
+            VStack(spacing: 0) {
                 InstallStatusView(isInstalled: $rosettaInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   name: "Rosetta")
+                Divider().opacity(0.5)
                 InstallStatusView(isInstalled: $engineInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   showUninstall: true,
                                   name: "Crosswire")
             }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
             .onAppear {
                 checkInstallStatus()
             }
             .onChange(of: shouldCheckInstallStatus) {
                 checkInstallStatus()
             }
-            Spacer()
-            HStack {
-                if let rosettaInstalled = rosettaInstalled,
-                   let engineInstalled = engineInstalled {
-                    if !rosettaInstalled || !engineInstalled {
-                        Button("setup.quit") {
-                            exit(0)
-                        }
-                        .keyboardShortcut(.cancelAction)
-                    }
-                    Spacer()
-                    Button(rosettaInstalled && engineInstalled ? "setup.done" : "setup.next") {
-                        if !rosettaInstalled {
-                            path.append(.rosetta)
-                            return
-                        }
+            Spacer(minLength: 16)
+            buttonRow
+        }
+        .padding(.horizontal, 28)
+        .padding(.bottom, 8)
+        .frame(width: 420, height: 320)
+    }
 
-                        if !engineInstalled {
-                            path.append(.engineSetup)
-                            return
-                        }
+    @ViewBuilder
+    private var heading: some View {
+        VStack(spacing: 6) {
+            Text(firstTime ? "setup.welcome" : "setup.title")
+                .font(.system(size: 22, weight: .semibold))
+            Text(firstTime ? "setup.welcome.subtitle" : "setup.subtitle")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
-                        showSetup = false
+    @ViewBuilder
+    private var buttonRow: some View {
+        HStack {
+            if let rosettaInstalled = rosettaInstalled,
+               let engineInstalled = engineInstalled {
+                if !rosettaInstalled || !engineInstalled {
+                    Button("setup.quit") {
+                        exit(0)
                     }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.cancelAction)
                 }
+                Spacer()
+                Button(rosettaInstalled && engineInstalled ? "setup.done" : "setup.next") {
+                    if !rosettaInstalled {
+                        path.append(.rosetta)
+                        return
+                    }
+                    if !engineInstalled {
+                        path.append(.engineSetup)
+                        return
+                    }
+                    showSetup = false
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+            } else {
+                Spacer()
             }
         }
-        .frame(width: 400, height: 200)
+        .frame(height: 32)
     }
 
     func checkInstallStatus() {
@@ -110,37 +124,43 @@ struct InstallStatusView: View {
     @State var text: String = String(localized: "setup.install.checking")
 
     var body: some View {
-        HStack {
-            Group {
-                if let installed = isInstalled {
-                    Circle()
-                        .foregroundColor(installed ? .green : .red)
-                } else {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-            .frame(width: 10)
+        HStack(spacing: 12) {
+            statusIcon
+                .frame(width: 22, height: 22)
             Text(String.init(format: text, name))
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
             Spacer()
-            if let installed = isInstalled {
-                if installed && showUninstall {
-                    Button("setup.uninstall") {
-                        uninstall()
-                    }
+            if let installed = isInstalled, installed && showUninstall {
+                Button("setup.uninstall") {
+                    uninstall()
                 }
+                .controlSize(.small)
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .onChange(of: isInstalled) {
             if let installed = isInstalled {
-                if installed {
-                    text = String(localized: "setup.install.installed")
-                } else {
-                    text = String(localized: "setup.install.notInstalled")
-                }
+                text = installed
+                    ? String(localized: "setup.install.installed")
+                    : String(localized: "setup.install.notInstalled")
             } else {
                 text = String(localized: "setup.install.checking")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        if let installed = isInstalled {
+            Image(systemName: installed ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(installed ? Color.green : Color.orange)
+                .symbolRenderingMode(.hierarchical)
+        } else {
+            ProgressView()
+                .controlSize(.small)
         }
     }
 
@@ -148,7 +168,6 @@ struct InstallStatusView: View {
         if name == "Crosswire" {
             CrosswireEngine.uninstall()
         }
-
         shouldCheckInstallStatus.toggle()
     }
 }
