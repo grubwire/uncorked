@@ -54,6 +54,7 @@ struct AppRow: View {
         .frame(minHeight: 60)
         .contentShape(Rectangle())
         .background(hovered ? Color.primary.opacity(0.07) : Color.clear)
+        .animation(.easeInOut(duration: 0.12), value: hovered)
         .onHover { hovered = $0 }
         .onTapGesture(count: 2) { onRun() }
         .onTapGesture { onPrimaryAction() }
