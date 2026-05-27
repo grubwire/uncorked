@@ -57,10 +57,9 @@ extension ContentView {
         guard let bottle else {
             provisioningMessage = nil
             showInstallAlert(
-                title: "Could not create bottle",
-                body: "Crosswire was unable to initialize a new wineprefix for \(bottleName). "
-                    + "This is usually a Wine engine problem (memory mapping or a missing binary). "
-                    + "See the latest log at ~/Library/Logs/app.Crosswire.Crosswire/."
+                title: "Could not set up \(bottleName)",
+                body: "Crosswire was unable to prepare a new environment for this app. "
+                    + "See the latest run log for details: ~/Library/Logs/app.Crosswire.Crosswire/."
             )
             return
         }
@@ -91,10 +90,8 @@ extension ContentView {
             showInstallAlert(
                 title: "Installer finished but no apps were detected",
                 body: "The installer ran, but Crosswire could not find anything to launch. "
-                    + "On Apple Silicon this most often means the installer crashed mid-install "
-                    + "(look for mmap errors in the log). "
-                    + "Log: ~/Library/Logs/app.Crosswire.Crosswire/. "
-                    + "You can delete the bottle from its settings panel."
+                    + "Check the latest run log for details: ~/Library/Logs/app.Crosswire.Crosswire/. "
+                    + "You can delete the app from its settings panel and try again."
             )
         }
     }

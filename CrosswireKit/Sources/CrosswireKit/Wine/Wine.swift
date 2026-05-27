@@ -97,19 +97,54 @@ public class Wine {
         )
     }
 
-    /// Execute a `wine start /unix {url}` command returning the output result
+    /// Execute a `wine start /unix {url}` command returning the output result.
+    /// Per-program plist (Program Settings/<exe>.plist) env / locale / args are auto-merged.
+    /// Caller-supplied `environment` keys and non-empty `args` override the plist.
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
     ) async throws {
+        var finalEnv = environment
+        var finalArgs = args
+        if let settings = loadProgramSettings(for: url, in: bottle) {
+            for (key, value) in settings.environment where finalEnv[key] == nil {
+                finalEnv[key] = value
+            }
+            if settings.locale != .auto, finalEnv["LC_ALL"] == nil {
+                finalEnv["LC_ALL"] = settings.locale.rawValue
+            }
+            if finalArgs.isEmpty, !settings.arguments.isEmpty {
+                finalArgs = settings.arguments.split { $0.isWhitespace }.map(String.init)
+            }
+        }
+
         if bottle.settings.dxvk {
             try enableDXVK(bottle: bottle)
         }
 
         for await _ in try Self.runWineProcess(
             name: url.lastPathComponent,
-            args: ["start", "/unix", url.path(percentEncoded: false)] + args,
-            bottle: bottle, environment: environment
+            args: ["start", "/unix", url.path(percentEncoded: false)] + finalArgs,
+            bottle: bottle, environment: finalEnv
         ) { }
+    }
+
+    /// Load the per-program plist for an exe inside a bottle, if one exists on disk.
+    /// Returns nil when the program has no plist (the common case).
+    private static func loadProgramSettings(for url: URL, in bottle: Bottle) -> ProgramSettings? {
+        let plistURL = bottle.url
+            .appending(path: "Program Settings")
+            .appending(path: url.lastPathComponent)
+            .appendingPathExtension("plist")
+        guard FileManager.default.fileExists(atPath: plistURL.path(percentEncoded: false)) else {
+            return nil
+        }
+        do {
+            let data = try Data(contentsOf: plistURL)
+            return try PropertyListDecoder().decode(ProgramSettings.self, from: data)
+        } catch {
+            Logger.wineKit.error("Failed to read per-program settings at \(plistURL.path): \(error)")
+            return nil
+        }
     }
 
     public static func generateRunCommand(
