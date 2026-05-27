@@ -19,6 +19,8 @@
 import Foundation
 import os.log
 
+// swiftlint:disable file_length
+
 @MainActor
 public class Wine {
     /// URL to the installed `DXVK` folder
