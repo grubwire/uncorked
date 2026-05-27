@@ -95,10 +95,11 @@ public extension Process {
         }
     }
 
-    /// Drain anything still in the pipes at termination and route it through
-    /// the same line splitter — previously this data was read with
-    /// `_ = readToEnd()` and DISCARDED, which is why long runs truncated at
-    /// whatever was already drained.
+    // Drain anything still in the pipes at termination and route it through
+    // the same line splitter — previously this data was read with
+    // `_ = readToEnd()` and DISCARDED, which is why long runs truncated at
+    // whatever was already drained.
+    // swiftlint:disable function_parameter_count
     private static func drainPipesAtTermination(
         pipe: Pipe,
         errorPipe: Pipe,
@@ -107,6 +108,7 @@ public extension Process {
         fileHandle: FileHandle?,
         continuation: AsyncStream<ProcessOutput>.Continuation
     ) {
+    // swiftlint:enable function_parameter_count
         pipe.fileHandleForReading.readabilityHandler = nil
         errorPipe.fileHandleForReading.readabilityHandler = nil
         do {
@@ -210,6 +212,7 @@ final class LineBuffer: @unchecked Sendable {
                 lineEnd = combined.index(before: lineEnd)
             }
             let lineData = combined[start..<lineEnd]
+            // swiftlint:disable:next optional_data_string_conversion
             let line = String(decoding: lineData, as: UTF8.self)
             emit(line)
             start = combined.index(after: index)
@@ -221,6 +224,7 @@ final class LineBuffer: @unchecked Sendable {
     /// Called at termination to flush a final non-newline-terminated line.
     func flush() -> String? {
         guard !carry.isEmpty else { return nil }
+        // swiftlint:disable:next optional_data_string_conversion
         let line = String(decoding: carry, as: UTF8.self)
         carry = Data()
         return line.isEmpty ? nil : line
