@@ -52,6 +52,10 @@ final class BottleVM: ObservableObject {
                 try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
                 let wineVer = try await Wine.wineVersion()
                 bottle.settings.wineVersion = SemanticVersion(wineVer) ?? SemanticVersion(0, 0, 0)
+                // Crash-storm prevention: stop Wine from spawning winedbg
+                // --auto on in-process crashes. Important for any JVM/JIT
+                // app — leaks stuck debugger procs otherwise.
+                try? await Wine.disableCrashDebugger(bottle: bottle)
                 // Add record
                 bottlesList.paths.append(newBottleDir)
                 loadBottles()

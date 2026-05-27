@@ -252,6 +252,32 @@ public class Wine {
         }
     }
 
+    /// Set AeDebug.Auto = 0 in both the 64-bit and 32-bit (Wow6432Node)
+    /// registry views. Stops Wine from spawning `winedbg --auto` on every
+    /// in-process crash. Critical for JVM-based apps under Wine — the HotSpot
+    /// JIT routinely triggers safepoint crashes that recover internally
+    /// (especially with `-Xint`), but each one was leaving a stuck winedbg
+    /// process behind. After a few hours of accumulation those debuggers can
+    /// bring the host Mac to its knees (saw 965 stuck procs + load avg 75
+    /// from one launcher session).
+    public static func disableCrashDebugger(bottle: Bottle) async throws {
+        let regContent = """
+        REGEDIT4
+
+        [HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug]
+        "Auto"="0"
+
+        [HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug]
+        "Auto"="0"
+
+        """
+        let tempURL = FileManager.default.temporaryDirectory
+            .appending(path: "crosswire-disable-aedebug-\(UUID().uuidString).reg")
+        try regContent.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try await runWine(["regedit", "/S", tempURL.path(percentEncoded: false)], bottle: bottle)
+    }
+
     public static func enableDXVK(bottle: Bottle) throws {
         try FileManager.default.replaceDLLs(
             in: bottle.url.appending(path: "drive_c").appending(path: "windows").appending(path: "system32"),
