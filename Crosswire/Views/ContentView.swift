@@ -21,6 +21,7 @@ import AppKit
 import CrosswireKit
 import SemanticVersion
 
+// swiftlint:disable type_body_length
 struct ContentView: View {
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
     @EnvironmentObject var bottleVM: BottleVM
@@ -35,6 +36,8 @@ struct ContentView: View {
     @State var provisioningMessage: String?
     @State var runtimesPrompt: RuntimesPrompt?
 
+    @FocusState private var searchFocused: Bool
+
     init(showSetup: Binding<Bool>) {
         self._showSetup = showSetup
     }
@@ -42,13 +45,11 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             actionRow
-            Divider()
             content
-            footer
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(CrosswireTheme.backgroundGradient.ignoresSafeArea())
         .sheet(item: $settingsBottle) { bottle in
             AppSettingsSheet(bottle: bottle, onDelete: {
                 settingsBottle = nil
@@ -86,55 +87,92 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Header & action row
+    // MARK: - Header
 
+    /// "Crosswire" wordmark, gear-icon settings entry on the right. Larger
+    /// and more confident than the prior 22pt — this is the brand surface
+    /// the user sees first; it sets the tone for the whole window.
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("Crosswire")
-                .font(.system(size: 22, weight: .semibold))
+                .font(CrosswireTheme.Typography.display)
+                .foregroundStyle(CrosswireTheme.textPrimary)
             Spacer()
             SettingsLink {
                 Image(systemName: "gearshape")
-                    .imageScale(.large)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(CrosswireTheme.textSecondary)
             }
             .buttonStyle(.borderless)
             .help("Settings")
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 24)
+        .padding(.top, 22)
+        .padding(.bottom, 16)
     }
 
-    private var footer: some View {
-        HStack {
-            Spacer()
-            Text(versionString)
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 4)
-    }
+    // MARK: - Action row (CTA + search)
 
+    /// Primary CTA "Install a Game or App" + library search. The CTA is the
+    /// most important affordance in the app (it's how anything gets into
+    /// the library at all); it gets the accent blue, the + glyph, and the
+    /// bigger height so it reads as obvious-and-primary.
     private var actionRow: some View {
         HStack(spacing: 12) {
             Button(action: installWindowsApp) {
-                HStack(spacing: 6) {
+                HStack(spacing: 7) {
                     Image(systemName: "plus")
-                    Text("Install Windows App")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Install a Game or App")
+                        .font(CrosswireTheme.Typography.buttonPrimary)
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
+                .foregroundStyle(CrosswireTheme.textOnAccent)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(CrosswireTheme.accent)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
+            .buttonStyle(.plain)
+            .help("Install a Windows game or app")
 
-            TextField("Search apps...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: .infinity)
+            librarySearchField
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 18)
+    }
+
+    /// Search field with the theme's surface fill and a blue focus ring that
+    /// honors the Crosswire accent instead of the user's system accent
+    /// (which could be orange and clash with the icon).
+    private var librarySearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(CrosswireTheme.textTertiary)
+            TextField("Search your library…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(CrosswireTheme.Typography.body)
+                .foregroundStyle(CrosswireTheme.textPrimary)
+                .focused($searchFocused)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(CrosswireTheme.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(
+                    searchFocused ? CrosswireTheme.accent : CrosswireTheme.surfaceStroke,
+                    lineWidth: searchFocused ? 1.5 : 1
+                )
+        )
+        .frame(maxWidth: .infinity)
+        .animation(CrosswireTheme.Motion.hover, value: searchFocused)
     }
 
     // MARK: - Content states
@@ -148,7 +186,7 @@ struct ContentView: View {
         } else if filteredBottles.isEmpty {
             noMatchState
         } else {
-            list
+            library
         }
     }
 
@@ -166,71 +204,94 @@ struct ContentView: View {
             Spacer()
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 28, weight: .light))
-                .foregroundStyle(.tertiary)
-            Text("No apps match \"\(searchText)\"")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CrosswireTheme.textTertiary)
+            Text("Nothing in your library matches “\(searchText)”")
+                .font(CrosswireTheme.Typography.body)
+                .foregroundStyle(CrosswireTheme.textSecondary)
             Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
-    private var list: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(filteredBottles) { bottle in
-                    AppRow(
-                        bottle: bottle,
-                        onPrimaryAction: { settingsBottle = bottle },
-                        onRun: { runPrimary(for: bottle) },
-                        onRunSpecific: { program in
-                            run(program: program, bottle: bottle)
-                        },
-                        onOpenSettings: { settingsBottle = bottle }
-                    )
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.08))
-                        .frame(height: 1)
-                        .padding(.leading, 78)
-                }
+    /// The library list. Section label sits above the rows so the user
+    /// understands what they're looking at — and it gives the surface a
+    /// header anchor instead of floating rows on a gradient.
+    private var library: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Library")
+                    .font(CrosswireTheme.Typography.title)
+                    .foregroundStyle(CrosswireTheme.textPrimary)
+                Spacer()
+                Text("^[\(filteredBottles.count) item](inflect: true)")
+                    .font(CrosswireTheme.Typography.entryMeta)
+                    .foregroundStyle(CrosswireTheme.textSecondary)
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(filteredBottles) { bottle in
+                        AppRow(
+                            bottle: bottle,
+                            onPrimaryAction: { runPrimary(for: bottle) },
+                            onRun: { runPrimary(for: bottle) },
+                            onRunSpecific: { program in
+                                run(program: program, bottle: bottle)
+                            },
+                            onOpenSettings: { settingsBottle = bottle }
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .animation(.default, value: bottleVM.bottles)
+            .animation(.default, value: searchText)
         }
-        .animation(.default, value: bottleVM.bottles)
-        .animation(.default, value: searchText)
     }
 
+    /// First-launch / empty-library state. Uses the app's own icon (single
+    /// source of truth — if the icon changes, so does this view), the
+    /// brand tagline, and the same blue CTA that drives the action row.
     private var emptyState: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 22) {
             Spacer()
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.10))
-                    .frame(width: 96, height: 96)
-                Image(systemName: "app.badge.checkmark")
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(Color.accentColor)
-            }
-            VStack(spacing: 6) {
-                Text("No apps yet")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Text("Install a Windows installer (.exe or .msi) to get started.\nCrosswire handles the rest.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 128, height: 128)
+                .shadow(color: CrosswireTheme.accent.opacity(0.25), radius: 24, x: 0, y: 8)
+            VStack(spacing: 8) {
+                Text("Your Windows library, on Mac.")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(CrosswireTheme.textPrimary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(2)
+                Text("Drop a Windows .exe to install your first game or app.")
+                    .font(CrosswireTheme.Typography.body)
+                    .foregroundStyle(CrosswireTheme.textSecondary)
+                    .multilineTextAlignment(.center)
             }
             Button(action: installWindowsApp) {
-                HStack(spacing: 6) {
+                HStack(spacing: 7) {
                     Image(systemName: "plus")
-                    Text("Install Windows App")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Install a Game or App")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
+                .foregroundStyle(CrosswireTheme.textOnAccent)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(CrosswireTheme.accent)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.plain)
             .padding(.top, 4)
+            Spacer()
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -243,13 +304,8 @@ struct ContentView: View {
         let sorted = bottleVM.bottles.sorted()
         if searchText.isEmpty { return sorted }
         return sorted.filter {
-            $0.settings.name.localizedCaseInsensitiveContains(searchText)
+            $0.displayName.localizedCaseInsensitiveContains(searchText)
         }
-    }
-
-    private var versionString: String {
-        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        return "v\(short)"
     }
 
     // MARK: - Lifecycle
@@ -286,21 +342,32 @@ struct ContentView: View {
     }
 }
 
+// swiftlint:enable type_body_length
+
 /// Modal overlay shown while a new app is being provisioned.
 struct ProvisioningOverlay: View {
     let message: String
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.35)
+            Color.black.opacity(0.45)
                 .ignoresSafeArea()
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 ProgressView()
                 Text(message)
-                    .font(.system(size: 13))
+                    .font(CrosswireTheme.Typography.body)
+                    .foregroundStyle(CrosswireTheme.textPrimary)
             }
-            .padding(24)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(CrosswireTheme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(CrosswireTheme.surfaceStroke, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.45), radius: 24, x: 0, y: 12)
         }
     }
 }

@@ -75,6 +75,7 @@
 		AB300012000000000000AA02 /* AppSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB300002000000000000AA02 /* AppSettingsSheet.swift */; };
 		AB300013000000000000AA03 /* AppTileIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB300003000000000000AA03 /* AppTileIcon.swift */; };
 		AB300014000000000000AA04 /* ContentView+Install.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB300004000000000000AA04 /* ContentView+Install.swift */; };
+		BFD1B92A22E31C8F79451104 /* CrosswireTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48DF165E670ADF3E17956342 /* CrosswireTheme.swift */; };
 		DB696FC82AFAE5DA0037EB2F /* PinCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB696FC72AFAE5DA0037EB2F /* PinCreationView.swift */; };
 		EB58FB552A499896002DC184 /* SemanticVersion in Frameworks */ = {isa = PBXBuildFile; productRef = EB58FB542A499896002DC184 /* SemanticVersion */; };
 		EEA5A2462A31DD65008274AE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA5A2452A31DD65008274AE /* AppDelegate.swift */; };
@@ -130,6 +131,7 @@
 		0173DF962FC6BDE80043FD8C /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		0173DF982FC6BFB50043FD8C /* crosswire-icon-1024.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "crosswire-icon-1024.icon"; sourceTree = "<group>"; };
 		18A050DC9787835284BB2BEB /* CommonRuntimesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CommonRuntimesView.swift; sourceTree = "<group>"; };
+		48DF165E670ADF3E17956342 /* CrosswireTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrosswireTheme.swift; sourceTree = "<group>"; };
 		6330DD952B1B0EA4007A625A /* RenameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameView.swift; sourceTree = "<group>"; };
 		6365C4C02B1AA69D00AAE1FD /* Animation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Animation+Extensions.swift"; sourceTree = "<group>"; };
 		6365C4C22B1AA8CD00AAE1FD /* BottleListEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottleListEntry.swift; sourceTree = "<group>"; };
@@ -333,6 +335,7 @@
 				6E899D1129CFC41D00A4A083 /* Info.plist */,
 				6E40495B29CCA19C006E3F1B /* Preview Content */,
 				6EB58AC82AEACE5E00B1ED3F /* Localizable.xcstrings */,
+				7F392A9926897FF3A43D36D0 /* Theme */,
 			);
 			path = Crosswire;
 			sourceTree = "<group>";
@@ -435,6 +438,15 @@
 				6EFDF6652AAE303300EF622F /* Icons.xcassets */,
 			);
 			path = CrosswireThumbnail;
+			sourceTree = "<group>";
+		};
+		7F392A9926897FF3A43D36D0 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				48DF165E670ADF3E17956342 /* CrosswireTheme.swift */,
+			);
+			name = Theme;
+			path = Theme;
 			sourceTree = "<group>";
 		};
 		AB120005000000000000AAA5 /* About */ = {
@@ -688,6 +700,7 @@
 				97C0E3509F0F36CBF7B8190C /* RuntimesPrompt.swift in Sources */,
 				0F85596667324331537E8D81 /* DetectedRuntimesSheet.swift in Sources */,
 				7B62BEB7665E12DD579B9F28 /* JavaAppDetector.swift in Sources */,
+				BFD1B92A22E31C8F79451104 /* CrosswireTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -19,10 +19,15 @@
 import SwiftUI
 import CrosswireKit
 
-/// One row in the main app list. Single-click opens settings (the more
-/// discoverable target), double-click runs the primary program.
+/// One row in the library list. Click anywhere on the row to run the entry's
+/// primary program (the row IS the run affordance — that's its job). The
+/// gear button on the right opens settings; it's smaller and secondary.
 struct AppRow: View {
     @ObservedObject var bottle: Bottle
+    /// Tap on the row body. Currently routed to onRun by ContentView so the
+    /// row's primary affordance is "click to run." Kept as a separate
+    /// callback so ContentView can rewire it (e.g. to a future selection
+    /// model) without touching this view.
     let onPrimaryAction: () -> Void
     let onRun: () -> Void
     let onRunSpecific: (Program) -> Void
@@ -33,30 +38,31 @@ struct AppRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            AppTileIcon(name: bottle.displayName, side: 44)
-            VStack(alignment: .leading, spacing: 2) {
+            AppTileIcon(name: bottle.displayName)
+            VStack(alignment: .leading, spacing: 3) {
                 Text(bottle.displayName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(CrosswireTheme.Typography.entryName)
+                    .foregroundStyle(CrosswireTheme.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if bottle.inFlight {
-                    Text("Setting up...")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+                Text(secondaryLine)
+                    .font(CrosswireTheme.Typography.entryMeta)
+                    .foregroundStyle(CrosswireTheme.textSecondary)
             }
             Spacer(minLength: 12)
             controls
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .frame(minHeight: 60)
+        .frame(height: CrosswireTheme.Layout.libraryRowHeight)
         .contentShape(Rectangle())
-        .background(hovered ? Color.primary.opacity(0.07) : Color.clear)
-        .animation(.easeInOut(duration: 0.12), value: hovered)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(hovered ? CrosswireTheme.surfaceHover : Color.clear)
+                .padding(.horizontal, 8)
+        )
+        .scaleEffect(hovered ? 1.005 : 1.0)
+        .animation(CrosswireTheme.Motion.hover, value: hovered)
         .onHover { hovered = $0 }
-        .onTapGesture(count: 2) { onRun() }
         .onTapGesture { onPrimaryAction() }
         .opacity(bottle.isAvailable ? 1.0 : 0.5)
         .onAppear {
@@ -66,21 +72,31 @@ struct AppRow: View {
         }
     }
 
+    /// The metadata line under the entry name. Currently:
+    /// - "Setting up..." while the bottle is being provisioned (in-flight)
+    /// - "Never launched" otherwise (placeholder until we add a
+    ///   last-launched timestamp to BottleSettings — queued as observability
+    ///   work; the brief calls for "Last played 2h ago" / "Never launched")
+    private var secondaryLine: String {
+        if bottle.inFlight { return "Setting up…" }
+        return "Never launched"
+    }
+
     @ViewBuilder
     private var controls: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             playButton
             Button(action: onOpenSettings) {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 30)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(CrosswireTheme.textSecondary)
+                    .frame(width: 28, height: 28)
             }
             .buttonStyle(.borderless)
             .help("Settings")
         }
-        // Stop the row's tap gestures from firing when the user clicks the
-        // buttons directly.
+        // Buttons are explicit interactive children — they must not let the
+        // row's `onTapGesture` fire underneath them.
         .onTapGesture {}
     }
 
@@ -110,26 +126,30 @@ struct AppRow: View {
         }
     }
 
-    /// Play affordance. Subtle glyph at rest, accent-tinted fill on row
-    /// hover so the primary action becomes obvious without competing for
-    /// attention across every row simultaneously.
+    /// Play affordance. Larger + more prominent than before per Brief 2 —
+    /// 34pt circle, accent-blue fill on row hover, soft accent-tinted ring
+    /// at rest so it always reads as "the run button" even before hover.
     @ViewBuilder
     private var playLabel: some View {
         Image(systemName: "play.fill")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(hovered ? Color.white : Color.secondary)
-            .frame(width: 30, height: 30)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(hovered ? CrosswireTheme.textOnAccent : CrosswireTheme.accent)
+            .frame(width: 34, height: 34)
             .background(
                 Circle()
-                    .fill(hovered ? Color.accentColor : Color.primary.opacity(0.08))
+                    .fill(hovered ? CrosswireTheme.accent : CrosswireTheme.accent.opacity(0.12))
+            )
+            .overlay(
+                Circle()
+                    .strokeBorder(CrosswireTheme.accent.opacity(hovered ? 0 : 0.25), lineWidth: 1)
             )
     }
 
     private var programPickerPopover: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Run...")
+            Text("Run…")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CrosswireTheme.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
                 .padding(.bottom, 4)

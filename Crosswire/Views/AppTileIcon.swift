@@ -18,31 +18,6 @@
 
 import SwiftUI
 
-/// Stable palette used for the placeholder app tiles. Picked to feel friendly
-/// against both light and dark window chrome.
-private let appTilePalette: [Color] = [
-    Color(red: 0.27, green: 0.45, blue: 0.85),
-    Color(red: 0.85, green: 0.35, blue: 0.40),
-    Color(red: 0.38, green: 0.65, blue: 0.42),
-    Color(red: 0.85, green: 0.55, blue: 0.25),
-    Color(red: 0.55, green: 0.40, blue: 0.80),
-    Color(red: 0.20, green: 0.60, blue: 0.70),
-    Color(red: 0.80, green: 0.45, blue: 0.65),
-    Color(red: 0.45, green: 0.50, blue: 0.55)
-]
-
-/// Deterministic color for an app/bottle name. Uses a tiny djb2-style hash so
-/// the same name always lands on the same palette slot regardless of run.
-func colorForProgramName(_ name: String) -> Color {
-    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return appTilePalette[0] }
-    var hash: UInt32 = 5381
-    for scalar in trimmed.unicodeScalars {
-        hash = hash &* 33 &+ scalar.value
-    }
-    return appTilePalette[Int(hash % UInt32(appTilePalette.count))]
-}
-
 /// Up to two uppercase initials drawn from the leading word characters of an
 /// app name. Falls back to the first two characters if no word boundary is
 /// found.
@@ -61,22 +36,33 @@ func initialsForProgramName(_ name: String) -> String {
     return (first + second).uppercased()
 }
 
-/// Square tile with the bottle's color and initials, sized 42x42 by default.
-/// Uses a vertical gradient + inner light bevel so the tile reads as a real
-/// surface rather than a flat color swatch.
+/// Compatibility shim — old call sites used `colorForProgramName` directly;
+/// canonical access is `CrosswireTheme.colorForLibraryEntry(name:)`.
+func colorForProgramName(_ name: String) -> Color {
+    return CrosswireTheme.colorForLibraryEntry(name: name)
+}
+
+/// Rounded-square tile rendering a library entry's monogram on top of one
+/// of the four icon-derived tile colors (deterministic per name — same entry
+/// always gets the same color). Sized at `side` points; corner radius
+/// matches macOS icon convention (`side * 0.22`).
+///
+/// This is the monogram-FALLBACK appearance — used when an extracted .exe
+/// icon isn't available (Brief 4 work). Real icons render at the same
+/// size + corner radius so they coexist visually in the library row.
 struct AppTileIcon: View {
     let name: String
-    var side: CGFloat = 42
+    var side: CGFloat = CrosswireTheme.Layout.libraryRowIconSide
 
-    private var base: Color { colorForProgramName(name) }
-    private var cornerRadius: CGFloat { max(6, side * 0.20) }
+    private var base: Color { CrosswireTheme.colorForLibraryEntry(name: name) }
+    private var cornerRadius: CGFloat { max(6, side * 0.22) }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [base.opacity(1.0), base.opacity(0.78)],
+                        colors: [base, base.opacity(0.78)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
