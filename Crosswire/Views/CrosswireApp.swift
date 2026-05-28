@@ -38,7 +38,7 @@ struct CrosswireApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(showSetup: $showSetup)
+            ContentView(showSetup: $showSetup, sparkleUpdater: updaterController.updater)
                 .frame(minWidth: ViewWidth.large, minHeight: 316)
                 .environmentObject(BottleVM.shared)
                 .onAppear {
@@ -133,9 +133,12 @@ struct CrosswireApp: App {
                 }
             }
         }
-        Settings {
-            SettingsView(updater: updaterController.updater)
-        }
+        // Settings scene removed in Brief 2 / Section 1 (inline-navigation pass).
+        // Settings now opens as a full-bleed inline destination within the
+        // main window via `ContentView.route = .settings`. The header gear
+        // button and the standard Cmd+, keyboard shortcut both route to it.
+        // SettingsView.swift is preserved on disk for reference but no
+        // longer mounted as a scene.
     }
 
     // MARK: - Window helpers

@@ -13,6 +13,7 @@
 		0173DF9A2FC6BFB50043FD8C /* crosswire-icon-1024.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0173DF982FC6BFB50043FD8C /* crosswire-icon-1024.icon */; };
 		0F85596667324331537E8D81 /* DetectedRuntimesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15E81B81388F5818CF6A5E8 /* DetectedRuntimesSheet.swift */; };
 		10B488492E29C934B380ED64 /* FailureWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90E69279487E2EC21976BBA /* FailureWatcher.swift */; };
+		15993F723EC1E52E4AA96671 /* InlineSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1A758CDD06FEDF58136816 /* InlineSettingsView.swift */; };
 		36C37A041521C9341FB5CB40 /* RuntimePresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7283F836592E92926EB66C02 /* RuntimePresets.swift */; };
 		41E4481FA77D4D93E01A6EC6 /* FailureReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A47AEC3C6282D015BB8500 /* FailureReportBuilder.swift */; };
 		6330DD962B1B0EA4007A625A /* RenameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6330DD952B1B0EA4007A625A /* RenameView.swift */; };
@@ -79,6 +80,7 @@
 		DB696FC82AFAE5DA0037EB2F /* PinCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB696FC72AFAE5DA0037EB2F /* PinCreationView.swift */; };
 		EB58FB552A499896002DC184 /* SemanticVersion in Frameworks */ = {isa = PBXBuildFile; productRef = EB58FB542A499896002DC184 /* SemanticVersion */; };
 		EEA5A2462A31DD65008274AE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA5A2452A31DD65008274AE /* AppDelegate.swift */; };
+		FEEE7329ECC0B7DC86638FB4 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDB38B94618F3DE070F13E7 /* AppRoute.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -131,6 +133,7 @@
 		0173DF962FC6BDE80043FD8C /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		0173DF982FC6BFB50043FD8C /* crosswire-icon-1024.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "crosswire-icon-1024.icon"; sourceTree = "<group>"; };
 		18A050DC9787835284BB2BEB /* CommonRuntimesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CommonRuntimesView.swift; sourceTree = "<group>"; };
+		3C1A758CDD06FEDF58136816 /* InlineSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InlineSettingsView.swift; sourceTree = "<group>"; };
 		48DF165E670ADF3E17956342 /* CrosswireTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrosswireTheme.swift; sourceTree = "<group>"; };
 		6330DD952B1B0EA4007A625A /* RenameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameView.swift; sourceTree = "<group>"; };
 		6365C4C02B1AA69D00AAE1FD /* Animation+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Animation+Extensions.swift"; sourceTree = "<group>"; };
@@ -189,6 +192,7 @@
 		AB300002000000000000AA02 /* AppSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsSheet.swift; sourceTree = "<group>"; };
 		AB300003000000000000AA03 /* AppTileIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTileIcon.swift; sourceTree = "<group>"; };
 		AB300004000000000000AA04 /* ContentView+Install.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Install.swift"; sourceTree = "<group>"; };
+		CCDB38B94618F3DE070F13E7 /* AppRoute.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
 		CED3F1691D908D479B3A905B /* JavaAppDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JavaAppDetector.swift; sourceTree = "<group>"; };
 		D15E81B81388F5818CF6A5E8 /* DetectedRuntimesSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DetectedRuntimesSheet.swift; sourceTree = "<group>"; };
 		DB696FC72AFAE5DA0037EB2F /* PinCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinCreationView.swift; sourceTree = "<group>"; };
@@ -352,6 +356,7 @@
 			isa = PBXGroup;
 			children = (
 				6E49E0202AECB7DB00009CAC /* SettingsView.swift */,
+				3C1A758CDD06FEDF58136816 /* InlineSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -373,6 +378,7 @@
 				AB300004000000000000AA04 /* ContentView+Install.swift */,
 				6E064B1329DD331F00D9A2D2 /* SparkleView.swift */,
 				6E7C07BF2AAF570100F6E66B /* FileOpenView.swift */,
+				CCDB38B94618F3DE070F13E7 /* AppRoute.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -701,6 +707,8 @@
 				0F85596667324331537E8D81 /* DetectedRuntimesSheet.swift in Sources */,
 				7B62BEB7665E12DD579B9F28 /* JavaAppDetector.swift in Sources */,
 				BFD1B92A22E31C8F79451104 /* CrosswireTheme.swift in Sources */,
+				FEEE7329ECC0B7DC86638FB4 /* AppRoute.swift in Sources */,
+				15993F723EC1E52E4AA96671 /* InlineSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

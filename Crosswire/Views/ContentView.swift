@@ -20,37 +20,61 @@ import SwiftUI
 import AppKit
 import CrosswireKit
 import SemanticVersion
+import Sparkle
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 struct ContentView: View {
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
+    let sparkleUpdater: SPUUpdater?
 
     @State var bottlesLoaded: Bool = false
     @State var searchText: String = ""
     @State var openedFileURL: URL?
     @State var setupStartingStage: SetupStage?
 
+    /// Top-level navigation. Library is the default; Settings + per-entry
+    /// detail are full-bleed inline destinations that slide in over the
+    /// library view. See `AppRoute` for the full rationale.
+    @State var route: AppRoute = .library
+
+    /// Retained for compatibility with the install flow's existing alerts;
+    /// the per-entry settings sheet is no longer driven by this (now it's
+    /// navigation via `route = .entryDetail(bottle.id)`).
     @State var settingsBottle: Bottle?
     @State var provisioningMessage: String?
     @State var runtimesPrompt: RuntimesPrompt?
 
     @FocusState private var searchFocused: Bool
 
-    init(showSetup: Binding<Bool>) {
+    init(showSetup: Binding<Bool>, sparkleUpdater: SPUUpdater? = nil) {
         self._showSetup = showSetup
+        self.sparkleUpdater = sparkleUpdater
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            actionRow
-            content
+        ZStack {
+            // Library is the always-present base layer. Settings + per-entry
+            // detail overlay it with slide-in transitions. Library doesn't
+            // animate out — the overlay just covers it.
+            libraryRoot
+
+            if route == .settings {
+                InlineSettingsView(updater: sparkleUpdater) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        route = .library
+                    }
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .zIndex(1)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(CrosswireTheme.backgroundGradient.ignoresSafeArea())
         .sheet(item: $settingsBottle) { bottle in
+            // Per-entry settings still uses .sheet for this commit. Section 2
+            // of the brief converts it to inline routing via .entryDetail.
             AppSettingsSheet(bottle: bottle, onDelete: {
                 settingsBottle = nil
             })
@@ -87,24 +111,46 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Library root (composes header + action row + content)
+
+    /// The library view as a single composed surface. Sits at the base of
+    /// the ZStack; the Settings (and per-entry, Section 2) overlays slide
+    /// in over it. Extracted as its own var so the body-level ZStack stays
+    /// readable.
+    private var libraryRoot: some View {
+        VStack(spacing: 0) {
+            header
+            actionRow
+            content
+        }
+    }
+
     // MARK: - Header
 
-    /// "Crosswire" wordmark, gear-icon settings entry on the right. Larger
-    /// and more confident than the prior 22pt — this is the brand surface
-    /// the user sees first; it sets the tone for the whole window.
+    /// "Crosswire" wordmark, gear-icon settings entry on the right. Gear now
+    /// routes to the inline `.settings` destination (was SettingsLink → a
+    /// separate macOS window); Cmd+, kept via `.keyboardShortcut` so the
+    /// standard Mac affordance still works.
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("Crosswire")
                 .font(CrosswireTheme.Typography.display)
                 .foregroundStyle(CrosswireTheme.textPrimary)
             Spacer()
-            SettingsLink {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    route = .settings
+                }
+            } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(CrosswireTheme.textSecondary)
+                    .contentShape(Rectangle())
+                    .padding(4)
             }
             .buttonStyle(.borderless)
-            .help("Settings")
+            .keyboardShortcut(",", modifiers: .command)
+            .help("Settings (⌘,)")
         }
         .padding(.horizontal, 24)
         .padding(.top, 22)
