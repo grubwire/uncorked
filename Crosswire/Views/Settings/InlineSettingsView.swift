@@ -251,7 +251,11 @@ struct InlineSettingsView: View {
                         .fill(CrosswireTheme.accent)
                 )
                 .font(CrosswireTheme.Typography.buttonPrimary)
-                .keyboardShortcut(.defaultAction)
+                // Esc dismisses. Return is intentionally NOT bound — the
+                // sidebar List below already owns Return for navigating
+                // sections, and `.defaultAction` would let the List
+                // intercept the Done shortcut first.
+                .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 14)
