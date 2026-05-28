@@ -80,6 +80,103 @@ class Winetricks {
         }
     }
 
+    /// Streaming progress signal from `runVerbs(:bottle:onProgress:)`. Each
+    /// value names the verb that's *currently* being installed, or `nil`
+    /// when the runner finishes a verb and there isn't a new one queued yet.
+    public typealias ProgressCallback = @MainActor (_ currentVerb: String?) -> Void
+
+    /// Run a list of winetricks verbs in-process (no Terminal AppleScript
+    /// bridge), streaming per-verb progress to a callback. Used by the
+    /// runtime-detector flow to show an in-app progress sheet.
+    ///
+    /// Returns `true` on a clean exit, `false` on any non-zero exit.
+    /// The full winetricks log is preserved at the returned path so the
+    /// user can inspect what happened on failure.
+    ///
+    /// - Note: `runCommand(:bottle:)` still exists for the user-driven
+    ///   manual Winetricks browser; that path keeps the Terminal bridge
+    ///   so users can interact with click-through installer dialogs.
+    @discardableResult
+    @MainActor static func runVerbs(
+        _ verbs: [String], bottle: Bottle,
+        onProgress: @escaping ProgressCallback = { _ in }
+    ) async -> (success: Bool, logURL: URL) {
+        let logURL = FileManager.default.temporaryDirectory
+            .appending(path: "crosswire-winetricks-\(UUID().uuidString).log")
+        guard !verbs.isEmpty else { return (true, logURL) }
+
+        let cabextractDir = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
+            .deletingLastPathComponent().path(percentEncoded: false) ?? ""
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/winetricks")
+        process.arguments = ["--unattended"] + verbs
+        process.environment = [
+            "PATH": "\(CrosswireEngine.binFolder.path):\(cabextractDir):/opt/homebrew/bin:/usr/bin:/bin",
+            "WINE": "Crosswire64",
+            "WINEPREFIX": bottle.url.path(percentEncoded: false),
+            "WINEDEBUG": "-all",
+            "HOME": NSHomeDirectory()
+        ]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        let logHandle: FileHandle?
+        FileManager.default.createFile(atPath: logURL.path(percentEncoded: false), contents: nil)
+        logHandle = try? FileHandle(forWritingTo: logURL)
+
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            logHandle?.write(data)
+            if let text = String(data: data, encoding: .utf8) {
+                for rawLine in text.split(separator: "\n") {
+                    let line = String(rawLine)
+                    // Look for the "Executing load_<verb>" pattern that
+                    // winetricks emits when it starts processing each verb.
+                    if let verb = extractActiveVerb(from: line, knownVerbs: verbs) {
+                        Task { @MainActor in onProgress(verb) }
+                    }
+                }
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            pipe.fileHandleForReading.readabilityHandler = nil
+            try? logHandle?.close()
+            return (false, logURL)
+        }
+
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            process.terminationHandler = { _ in cont.resume() }
+        }
+        pipe.fileHandleForReading.readabilityHandler = nil
+        try? logHandle?.close()
+        return (process.terminationStatus == 0, logURL)
+    }
+
+    /// Parse the active verb from a winetricks output line. Matches
+    /// `Executing load_<verb>` (the function name winetricks calls per
+    /// verb) — falls back to looking for any of the known verbs as a
+    /// substring so we still get *something* for verbs that have
+    /// non-`load_*`-style runners.
+    private static func extractActiveVerb(from line: String, knownVerbs: [String]) -> String? {
+        if let range = line.range(of: "Executing load_") {
+            let tail = line[range.upperBound...]
+            // verb name runs up to whitespace, paren, or end
+            if let endIdx = tail.firstIndex(where: { $0.isWhitespace || $0 == "(" }) {
+                return String(tail[..<endIdx])
+            }
+            return String(tail)
+        }
+        for verb in knownVerbs where line.contains(verb) {
+            return verb
+        }
+        return nil
+    }
+
     static func parseVerbs() async -> [WinetricksCategory] {
         // Grab the verbs file
         let verbsURL = CrosswireEngine.libraryFolder.appending(path: "verbs.txt")

@@ -65,7 +65,23 @@ extension ContentView {
             return
         }
 
-        provisioningMessage = "Running installer..."
+        // Static-analyze the picked exe's PE imports BEFORE running it. If we
+        // detect runtimes the bottle doesn't have (vcrun, dotnet, d3dx, etc.),
+        // surface a confirmation sheet that installs them via winetricks
+        // first. .msi / .bat get skipped because their PE imports don't
+        // describe what the installer will run.
+        let detected = pickedURL.pathExtension.lowercased() == "exe"
+            ? RuntimeDetector.detect(at: pickedURL)
+            : []
+        if !detected.isEmpty {
+            provisioningMessage = nil
+            let installed = await presentRuntimesSheet(
+                exeName: pickedURL.lastPathComponent, detected: detected, bottle: bottle
+            )
+            provisioningMessage = "Running \(installed.isEmpty ? "installer" : "installer (runtimes ready)")..."
+        } else {
+            provisioningMessage = "Running installer..."
+        }
         NSApp.miniaturizeAll(nil)
         var installerError: Error?
         do {
@@ -108,6 +124,23 @@ extension ContentView {
                 body: "The installer ran, but Crosswire could not find anything to launch. "
                     + "Check the latest run log for details: ~/Library/Logs/app.Crosswire.Crosswire/. "
                     + "You can delete the app from its settings panel and try again."
+            )
+        }
+    }
+
+    /// Present the runtimes-detected sheet and suspend until the user
+    /// makes a decision. Returns the verbs that were actually installed
+    /// (empty when the user skipped).
+    @MainActor
+    func presentRuntimesSheet(
+        exeName: String, detected: [DetectedRuntime], bottle: Bottle
+    ) async -> [String] {
+        await withCheckedContinuation { continuation in
+            runtimesPrompt = RuntimesPrompt(
+                exeName: exeName,
+                detected: detected,
+                bottle: bottle,
+                continuation: continuation
             )
         }
     }

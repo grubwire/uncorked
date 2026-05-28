@@ -33,6 +33,7 @@ struct ContentView: View {
 
     @State var settingsBottle: Bottle?
     @State var provisioningMessage: String?
+    @State var runtimesPrompt: RuntimesPrompt?
 
     init(showSetup: Binding<Bool>) {
         self._showSetup = showSetup
@@ -57,6 +58,16 @@ struct ContentView: View {
             FileOpenView(fileURL: url,
                          currentBottle: nil,
                          bottles: bottleVM.bottles)
+        }
+        .sheet(item: $runtimesPrompt) { prompt in
+            DetectedRuntimesSheet(
+                exeName: prompt.exeName,
+                detected: prompt.detected,
+                bottle: prompt.bottle
+            ) { installed in
+                prompt.continuation.resume(returning: installed)
+                runtimesPrompt = nil
+            }
         }
         .sheet(isPresented: $showSetup, onDismiss: { setupStartingStage = nil }, content: {
             SetupView(startingStage: setupStartingStage, showSetup: $showSetup, firstTime: false)
