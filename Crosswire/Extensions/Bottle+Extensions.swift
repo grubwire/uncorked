@@ -296,11 +296,16 @@ extension Bottle {
             settings.primaryProgramURL = visible[0]
         }
 
-        // Registry uninstall DisplayName is a better label than the exe's
-        // filename. Match against the primary program's install dir.
-        if let primary = settings.primaryProgramURL,
-           let regName = registryDisplayName(for: primary) {
-            settings.appDisplayName = regName
+        // Identity preference (best -> worst) in this no-Start-Menu branch:
+        // VS_VERSIONINFO (ProductName/FileDescription/InternalName), then
+        // registry uninstall DisplayName, then installer filename (default).
+        if let primary = settings.primaryProgramURL {
+            if let peFile = try? PEFile(url: primary),
+               let viName = peFile.displayName(), !viName.isEmpty {
+                settings.appDisplayName = viName
+            } else if let regName = registryDisplayName(for: primary) {
+                settings.appDisplayName = regName
+            }
         }
     }
 
