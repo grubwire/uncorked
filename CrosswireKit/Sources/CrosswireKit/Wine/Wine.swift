@@ -367,6 +367,39 @@ public class Wine {
         try await runWine(["regedit", "/S", tempURL.path(percentEncoded: false)], bottle: bottle)
     }
 
+    /// Add a Wine DLL override at
+    /// `HKEY_CURRENT_USER\Software\Wine\DllOverrides`. Idempotent: if an
+    /// entry for `dll` already exists with any value, leaves it untouched
+    /// (respects user customization). Returns true when an override was
+    /// actually written.
+    ///
+    /// The headline use case is `dwrite=builtin` for self-contained
+    /// JavaFX launchers — Wine's built-in dwrite avoids the crash path
+    /// the bundled MS dwrite hits during the post-Login CSS reapply.
+    @discardableResult
+    public static func setDllOverrideIfAbsent(
+        _ dll: String, value: String, bottle: Bottle
+    ) async throws -> Bool {
+        let userReg = bottle.url.appending(path: "user.reg")
+        if let contents = try? String(contentsOf: userReg, encoding: .utf8),
+           contents.contains("\"\(dll)\"=") {
+            return false
+        }
+        let regContent = """
+        REGEDIT4
+
+        [HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides]
+        "\(dll)"="\(value)"
+
+        """
+        let tempURL = FileManager.default.temporaryDirectory
+            .appending(path: "crosswire-dll-override-\(UUID().uuidString).reg")
+        try regContent.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try await runWine(["regedit", "/S", tempURL.path(percentEncoded: false)], bottle: bottle)
+        return true
+    }
+
     public static func enableDXVK(bottle: Bottle) throws {
         try FileManager.default.replaceDLLs(
             in: bottle.url.appending(path: "drive_c").appending(path: "windows").appending(path: "system32"),

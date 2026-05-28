@@ -282,6 +282,13 @@ struct AppSettingsSheet: View {
     }
 
     private func pickAdHocExecutable() {
+        // TODO(backlog): this path does NOT invoke JavaAppDetector. If the
+        // user picks a self-contained JavaFX launcher here (rather than via
+        // the create-new-bottle install flow), the per-program plist + the
+        // bottle's dwrite=builtin override are never seeded automatically.
+        // Workaround: install Java apps through "Install Windows App" so a
+        // fresh bottle is created. Fix is to call JavaAppDetector.applyDefaults
+        // here too, gated on first-time selection per .exe.
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false

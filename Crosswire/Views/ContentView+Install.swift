@@ -112,7 +112,7 @@ extension ContentView {
         // the .exe IS the app the user wanted to run.
         if bottle.userVisiblePrograms.isEmpty,
            pickedURL.pathExtension.lowercased() == "exe",
-           adoptPortableExe(pickedURL, into: bottle) {
+           await adoptPortableExe(pickedURL, into: bottle) {
             provisioningMessage = nil
             return
         }
@@ -125,7 +125,7 @@ extension ContentView {
         // before any auto-launch attempt. Orthogonal to RuntimeDetector,
         // which only sees Win32 PE imports.
         for program in bottle.userVisiblePrograms {
-            JavaAppDetector.writeDefaultPlistIfNeeded(forExeAt: program.url, in: bottle)
+            await JavaAppDetector.applyDefaultsIfNeeded(forExeAt: program.url, in: bottle)
         }
 
         provisioningMessage = nil
@@ -161,7 +161,7 @@ extension ContentView {
     /// `Program Files (x86)/<stem>/` so subsequent program scans and the
     /// Run button can find it. Sets primaryProgramURL + userVisible to
     /// the in-bottle path. Returns true on success.
-    private func adoptPortableExe(_ source: URL, into bottle: Bottle) -> Bool {
+    private func adoptPortableExe(_ source: URL, into bottle: Bottle) async -> Bool {
         let stem = source.deletingPathExtension().lastPathComponent
         let targetDir = bottle.url
             .appending(path: "drive_c")
@@ -186,7 +186,7 @@ extension ContentView {
         // not the surrounding tree. The plist is written for the
         // in-bottle target path (same basename as source, so the helper
         // keys it correctly off lastPathComponent).
-        JavaAppDetector.writeDefaultPlistIfNeeded(forExeAt: source, in: bottle)
+        await JavaAppDetector.applyDefaultsIfNeeded(forExeAt: source, in: bottle)
         return true
     }
 

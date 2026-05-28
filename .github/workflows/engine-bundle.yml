@@ -113,18 +113,30 @@ jobs:
         if: steps.gate.outputs.needed == 'true'
         run: bash scripts/generate-wrappers.sh /tmp/engine/bin
 
-      # Apply CW HACK 20760 (WoW64 lretq thunk) to wow64cpu.dll. Gcenx ships
-      # the upstream-Wine pre-built DLL; under Rosetta 2 its ljmp-based 32->64
-      # transition crashes with "Exception frame is not in stack limits". We
-      # rebuild just wow64cpu.dll from source with the patch applied and swap
-      # it into the engine tree before signing. PE binary, not Mach-O, so the
-      # subsequent sign-engine.sh step leaves it alone (correctly).
+      # Patch + selective-rebuild pipeline.
       #
-      # Other CW patches the local dev tree carries (CW 22131 / 24945 / 25719
-      # / 18947 / 23427 / 20186 / 24256 — all in dlls/ntdll/unix/) would need
-      # a full Wine rebuild to land. Adding those is a separate workflow
-      # overhaul; for now only the PE-side CW 20760 ships from CI.
-      - name: Install Wine cross-compile deps for CW 20760
+      # Gcenx ships prebuilt binaries. We swap in patched copies of just the
+      # files our patch scripts touch — the rest of the engine remains the
+      # Gcenx artifact, unchanged and pre-signed. Steps:
+      #
+      #   1. Apply every scripts/patch-*.py in sorted order against a fresh
+      #      Gcenx/wine source clone.
+      #   2. Auto-derive the rebuild list from scripts/patches/*.patch
+      #      (`+++ b/<path>` lines → make targets via a small mapping).
+      #      No hard-coded "build these dylibs" list — adding a new patch
+      #      that touches dlls/foo/bar.c automatically extends the build.
+      #   3. Configure + build only the derived targets.
+      #   4. Swap by basename into /tmp/engine, with .gcenx.bak backups so
+      #      the patch is auditable in place.
+      #   5. Verify the swapped binaries actually carry the patch (strings
+      #      markers for Mach-O; sha-changed-vs-Gcenx for PE — wow64cpu.dll
+      #      has no string markers since it's MinGW-cross with no __APPLE__).
+      #   6. sign-engine.sh re-signs Mach-O binaries (skips PE — correct).
+      #
+      # Currently applies: patch-cw20760.py (cpu.c → wow64cpu.dll),
+      # patch-cw-signal.py (signal_x86_64.c → ntdll.so),
+      # patch-cw-virtual.py (virtual.c → ntdll.so).
+      - name: Install Wine build deps
         if: steps.gate.outputs.needed == 'true'
         run: |
           # Apple's bundled bison is 2.3; Wine requires >=3.0.
@@ -133,7 +145,7 @@ jobs:
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
           which x86_64-w64-mingw32-gcc || ls -la "$(brew --prefix mingw-w64)/bin/" | head
 
-      - name: Clone Gcenx/wine source and apply CW 20760
+      - name: Clone Gcenx/wine source
         if: steps.gate.outputs.needed == 'true'
         run: |
           set -euo pipefail
@@ -146,18 +158,107 @@ jobs:
             echo "No wine-${TAG} tag in Gcenx/wine, using master."
             git clone --depth=1 --branch master https://github.com/Gcenx/wine.git /tmp/wine-src
           fi
-          python3 scripts/patch-cw20760.py /tmp/wine-src
+          # Record the commit the patches landed against, so a later mismatch
+          # is debuggable from the workflow logs alone.
+          git -C /tmp/wine-src log -1 --oneline
 
-      - name: Configure Wine source (PE cross only, no host deps)
+      - name: Apply all patch scripts
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          # Sorted order is stable per platform; the patches are independent
+          # (different files) so order is not load-bearing today, but if a
+          # later patch ever depends on another it'll be sorted by filename.
+          shopt -s nullglob
+          PATCHES=(scripts/patch-*.py)
+          if [ ${#PATCHES[@]} -eq 0 ]; then
+            echo "::error::No scripts/patch-*.py found — workflow expects at least one."
+            exit 1
+          fi
+          for patch in "${PATCHES[@]}"; do
+            echo "=== $patch ==="
+            python3 "$patch" /tmp/wine-src
+          done
+
+      - name: Derive rebuild list from patch files
+        id: rebuild
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          # Read every scripts/patches/*.patch, pull the modified source
+          # paths from `+++ b/<path>` lines, map each to its make target
+          # via the table below. Outputs two space-separated lists:
+          #   targets    — make targets to build (e.g. dlls/ntdll/ntdll.so)
+          #   artifacts  — built output paths to swap into the engine
+          #
+          # Implemented in Python (the runner's default /bin/bash is 3.2,
+          # no associative arrays). Add a new MAPPING entry whenever a
+          # future patch touches a different subsystem.
+          OUTPUT=$(python3 - <<'PY'
+          import glob, os, re, sys
+
+          # (source-path regex, make target, built artifact)
+          MAPPING = [
+              (r'dlls/wow64cpu/.*\.c$',          'dlls/wow64cpu/x86_64-windows/wow64cpu.dll', 'dlls/wow64cpu/x86_64-windows/wow64cpu.dll'),
+              (r'dlls/ntdll/unix/.*\.c$',        'dlls/ntdll/ntdll.so',                       'dlls/ntdll/ntdll.so'),
+              (r'dlls/ntdll/[^/]*\.c$',          'dlls/ntdll/ntdll.so',                       'dlls/ntdll/ntdll.so'),
+              (r'dlls/win32u/.*\.c$',            'dlls/win32u/win32u.so',                     'dlls/win32u/win32u.so'),
+              (r'dlls/winemac\.drv/.*\.[cm]$',   'dlls/winemac.drv/winemac.so',               'dlls/winemac.drv/winemac.so'),
+          ]
+
+          patch_files = sorted(glob.glob('scripts/patches/*.patch'))
+          if not patch_files:
+              print('::error::scripts/patches/ has no .patch files; rebuild list would be empty.', file=sys.stderr)
+              sys.exit(1)
+
+          targets, artifacts, unmapped = [], [], []
+          for pf in patch_files:
+              with open(pf) as f:
+                  for line in f:
+                      m = re.match(r'^\+\+\+ b/(.+)$', line.rstrip())
+                      if not m:
+                          continue
+                      path = m.group(1)
+                      for pat, tgt, art in MAPPING:
+                          if re.match(pat, path):
+                              if tgt not in targets:
+                                  targets.append(tgt)
+                              if art not in artifacts:
+                                  artifacts.append(art)
+                              break
+                      else:
+                          unmapped.append(f'{pf}:{path}')
+
+          if unmapped:
+              print('::error::Patch touches unmapped source path — extend MAPPING in derive-rebuild step.', file=sys.stderr)
+              for u in unmapped:
+                  print(f'  {u}', file=sys.stderr)
+              sys.exit(1)
+
+          print('TARGETS=' + ' '.join(targets))
+          print('ARTIFACTS=' + ' '.join(artifacts))
+          PY
+          )
+          echo "$OUTPUT"
+          TARGETS=$(echo "$OUTPUT" | grep '^TARGETS=' | cut -d= -f2-)
+          ARTIFACTS=$(echo "$OUTPUT" | grep '^ARTIFACTS=' | cut -d= -f2-)
+          echo "Derived make targets: $TARGETS"
+          echo "Derived build artifacts: $ARTIFACTS"
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          echo "artifacts=$ARTIFACTS" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Wine source (PE cross + host x86_64)
         if: steps.gate.outputs.needed == 'true'
         run: |
           set -euo pipefail
           cd /tmp/wine-src
-          # Cross-compile to x86_64 so the resulting PE DLL ABI-matches the
-          # x86_64 Gcenx engine (which runs under Rosetta on Apple Silicon).
-          # Disable every host-side dep — we only need the PE build chain.
-          # Keep mingw enabled so configure populates PE_ARCHS and the
-          # x86_64-windows target builds.
+          # Cross-compile to x86_64 so both the PE DLLs and the host-side
+          # Mach-O .so files ABI-match the x86_64 Gcenx engine. The macos-
+          # latest runner is arm64; --host=x86_64-apple-darwin + clang -arch
+          # x86_64 produces x86_64 for both worlds. Optional deps disabled
+          # below are not used by the dylibs we rebuild (ntdll, wow64cpu).
+          # If a future patch touches a subsystem with deps, drop the
+          # corresponding --without flag.
           export CC="clang -arch x86_64"
           export CXX="clang++ -arch x86_64"
           ./configure \
@@ -176,32 +277,112 @@ jobs:
             --without-xrandr --without-xrender --without-xshape --without-xshm \
             --without-xxf86vm 2>&1 | tail -30
 
-      - name: Build patched wow64cpu.dll
+      - name: Build patched targets
         if: steps.gate.outputs.needed == 'true'
+        env:
+          MAKE_TARGETS: ${{ steps.rebuild.outputs.targets }}
         run: |
           set -euo pipefail
           cd /tmp/wine-src
-          make -j2 dlls/wow64cpu/x86_64-windows/wow64cpu.dll 2>&1 | tail -20
-          ls -la dlls/wow64cpu/x86_64-windows/wow64cpu.dll
-          file dlls/wow64cpu/x86_64-windows/wow64cpu.dll
+          # shellcheck disable=SC2086
+          make -j2 $MAKE_TARGETS 2>&1 | tail -40
+          # Show what was built so a failed swap is obvious in logs.
+          for art in ${{ steps.rebuild.outputs.artifacts }}; do
+            if [ ! -f "$art" ]; then
+              echo "::error::Expected built artifact missing: $art"
+              exit 1
+            fi
+            ls -la "$art"
+            file "$art"
+          done
 
-      - name: Swap patched wow64cpu.dll into engine
+      - name: Swap patched artifacts into engine
+        if: steps.gate.outputs.needed == 'true'
+        env:
+          ARTIFACTS: ${{ steps.rebuild.outputs.artifacts }}
+        run: |
+          set -euo pipefail
+          # For each built artifact, find its match in the engine tree by
+          # basename and swap. Backup the Gcenx original as .gcenx.bak so
+          # the swap is auditable post-package.
+          for art in $ARTIFACTS; do
+            base="$(basename "$art")"
+            target="$(find /tmp/engine -type f -name "$base" | head -n 1)"
+            if [ -z "$target" ]; then
+              echo "::error::Engine tree has no $base to swap into."
+              exit 1
+            fi
+            cp "$target" "${target}.gcenx.bak"
+            cp "/tmp/wine-src/$art" "$target"
+            echo "Replaced $base:"
+            shasum -a 256 "$target" "${target}.gcenx.bak"
+          done
+
+      - name: Verify patched binaries carry expected markers
         if: steps.gate.outputs.needed == 'true'
         run: |
           set -euo pipefail
-          TARGET=/tmp/engine/lib/wine/x86_64-windows/wow64cpu.dll
-          if [ ! -f "$TARGET" ]; then
-            echo "::error::Engine tree is missing $TARGET — Gcenx archive layout changed?"
-            exit 1
-          fi
-          # Stash the Gcenx original as a backup the same way the local dev
-          # engine carries .gcenx.bak files, so the patch is auditable
-          # in-place.
-          cp "$TARGET" "${TARGET}.gcenx.bak"
-          cp /tmp/wine-src/dlls/wow64cpu/x86_64-windows/wow64cpu.dll "$TARGET"
-          echo "Replaced wow64cpu.dll (CW 20760 patched):"
-          shasum -a 256 "$TARGET" "${TARGET}.gcenx.bak"
-          # Drop the source tree to save disk for subsequent steps.
+          # Mach-O .so files: the patch comments embed unique strings that
+          # show up in `strings` output. Each marker corresponds to a
+          # specific CW HACK; if the swap dropped the wrong file or the
+          # build silently skipped a translation unit, this catches it.
+          # Pipe-delimited so the marker text can contain spaces.
+          STRING_CHECKS=(
+            'ntdll.so|emulated an XGETBV instruction|CW HACK 23427'
+            'ntdll.so|faking success|CW HACK 22131'
+            'ntdll.so|HACK: write fault on a w|x page|CW HACK 24945'
+            'ntdll.so|HACK: exec fault on executable page|CW HACK 25719'
+          )
+          for row in "${STRING_CHECKS[@]}"; do
+            basename="${row%%|*}"
+            rest="${row#*|}"
+            marker="${rest%|*}"          # everything between first and last |
+            label="${rest##*|}"
+            target="$(find /tmp/engine -type f -name "$basename" ! -name "*.gcenx.bak" | head -n 1)"
+            if [ -z "$target" ]; then
+              echo "::error::No $basename in engine tree to verify."
+              exit 1
+            fi
+            if ! strings "$target" | grep -qF "$marker"; then
+              echo "::error::$basename missing marker for $label (\"$marker\"). Patch did not land in build."
+              exit 1
+            fi
+            echo "  OK: $basename carries $label marker"
+          done
+
+          # PE binaries (MinGW-cross, __APPLE__ undefined → no marker strings).
+          # Best available check: the swapped file must differ from the
+          # Gcenx original backed up alongside it. Combined with the patch
+          # script's source-modification assertion, this proves a patched
+          # build was produced and swapped in.
+          SHA_CHECKS=(
+            'wow64cpu.dll|CW HACK 20760'
+          )
+          for row in "${SHA_CHECKS[@]}"; do
+            basename="${row%%|*}"
+            label="${row#*|}"
+            target="$(find /tmp/engine -type f -name "$basename" ! -name "*.gcenx.bak" | head -n 1)"
+            backup="${target}.gcenx.bak"
+            if [ ! -f "$backup" ]; then
+              echo "::error::No backup for $basename — swap step did not run?"
+              exit 1
+            fi
+            sha_new="$(shasum -a 256 "$target" | awk '{print $1}')"
+            sha_old="$(shasum -a 256 "$backup" | awk '{print $1}')"
+            if [ "$sha_new" = "$sha_old" ]; then
+              echo "::error::$basename sha unchanged vs Gcenx original — patch did not affect the build."
+              exit 1
+            fi
+            echo "  OK: $basename sha changed for $label ($sha_old -> $sha_new)"
+          done
+
+      - name: Strip .gcenx.bak backups and source tree
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          # .gcenx.bak files are debugging aids during verification; they
+          # should not ship in the engine artifact (bloat + confusion).
+          find /tmp/engine -name "*.gcenx.bak" -delete
           rm -rf /tmp/wine-src
 
       - name: Sign all Mach-O files

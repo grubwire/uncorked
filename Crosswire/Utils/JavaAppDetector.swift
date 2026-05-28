@@ -71,27 +71,51 @@ enum JavaAppDetector {
         return false
     }
 
-    /// If `exeURL` looks like a self-contained Java launcher AND no
-    /// per-program plist exists yet, write a default plist seeded with
-    /// `_JAVA_OPTIONS`. Existing plists are left alone — the user may
-    /// have customized them.
+    /// If `exeURL` looks like a self-contained Java launcher, seed two
+    /// defaults so the first launch works without manual configuration:
+    ///
+    ///   1. A per-program plist with `_JAVA_OPTIONS=-Dprism.order=j2d -Xint`
+    ///      (skipped if a plist already exists — user may have customized).
+    ///   2. A bottle-scoped `dwrite=builtin` DLL override (skipped if any
+    ///      dwrite override already exists — same respect-the-user rule).
+    ///      The MS dwrite that ships with self-contained JREs crashes
+    ///      during JavaFX's post-Login CSS reapply; Wine's builtin
+    ///      sidesteps the crash. Confirmed empirically against SWG
+    ///      Legends 2026-05-28.
     ///
     /// The plist is written via `ProgramSettings.encode(to:)` (Codable +
     /// `PropertyListEncoder`) rather than a string template, so `locale`
     /// serializes as an empty string (`Locales.auto.rawValue == ""`).
     /// A hand-written `<string>auto</string>` would make
     /// `PropertyListDecoder` throw `dataCorrupted` next launch.
+    ///
+    /// Returns true when the plist side wrote a new file; the override
+    /// is bottle-scoped and idempotent, so its result isn't surfaced.
     @discardableResult
     @MainActor
-    static func writeDefaultPlistIfNeeded(forExeAt exeURL: URL, in bottle: Bottle) -> Bool {
+    static func applyDefaultsIfNeeded(forExeAt exeURL: URL, in bottle: Bottle) async -> Bool {
         guard isSelfContainedJavaApp(at: exeURL) else { return false }
 
+        let plistWritten = writeDefaultPlist(forExeAt: exeURL, in: bottle)
+
+        do {
+            try await Wine.setDllOverrideIfAbsent("dwrite", value: "builtin", bottle: bottle)
+        } catch {
+            print("JavaAppDetector: failed to set dwrite=builtin override: \(error)")
+        }
+
+        return plistWritten
+    }
+
+    /// Writes the JVM env-var plist beside `exeURL`. Caller is expected
+    /// to have already verified `isSelfContainedJavaApp(at:)`.
+    @MainActor
+    private static func writeDefaultPlist(forExeAt exeURL: URL, in bottle: Bottle) -> Bool {
         let settingsDir = bottle.url.appending(path: "Program Settings")
         let plistURL = settingsDir
             .appending(path: exeURL.lastPathComponent)
             .appendingPathExtension("plist")
 
-        // Contract: don't overwrite a user-customized plist.
         if FileManager.default.fileExists(atPath: plistURL.path(percentEncoded: false)) {
             return false
         }
