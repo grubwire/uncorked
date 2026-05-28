@@ -277,6 +277,29 @@ jobs:
             --without-xrandr --without-xrender --without-xshape --without-xshm \
             --without-xxf86vm 2>&1 | tail -30
 
+      - name: Freeze wineserver protocol version
+        if: steps.gate.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          cd /tmp/wine-src
+          # tools/make_requests regenerates include/wine/server_protocol.h
+          # from server/protocol.def and AUTO-BUMPS SERVER_PROTOCOL_VERSION
+          # by 1 if the regenerated content differs from what's on disk.
+          # Gcenx ships a pre-generated header whose formatting differs
+          # slightly from what a fresh tools/make_requests run produces
+          # (whitespace / Perl-version drift). So a clean CI build flips
+          # the version from 934 to 935, and the resulting ntdll.so can't
+          # talk to the Gcenx wineserver we ship (which is still 934).
+          #
+          # Touching the header makes its mtime newer than protocol.def
+          # so make skips the make_requests dependency rule. Safe as long
+          # as none of our patches modify protocol.def — they don't today;
+          # the smoke test catches it if a future one ever does (mismatch
+          # error will reappear, with this comment as the breadcrumb).
+          ORIG_VERSION=$(grep "^#define SERVER_PROTOCOL_VERSION " include/wine/server_protocol.h | awk '{print $3}')
+          echo "Pinning SERVER_PROTOCOL_VERSION at $ORIG_VERSION (Gcenx wineserver ABI)."
+          touch include/wine/server_protocol.h
+
       - name: Build patched targets
         if: steps.gate.outputs.needed == 'true'
         env:
