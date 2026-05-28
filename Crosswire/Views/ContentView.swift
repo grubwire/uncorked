@@ -147,8 +147,15 @@ struct ContentView: View {
         // Menu label keeping the source's full-size reps), and the closure is
         // invoked at the backing scale so it stays crisp on Retina. Drawing
         // into the full rect centers the source content within the bounds.
-        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            // The toolbar Menu button seats this 18pt label ~1.75pt high in its
+            // capsule, and SwiftUI offset/padding on the label is ignored, so
+            // we bake the downward nudge into the bitmap. Non-flipped origin is
+            // bottom-left, so a negative y shifts the glyph down; the source's
+            // built-in bottom margin absorbs the shift without clipping content.
+            let shift: CGFloat = 1.75
+            source.draw(in: NSRect(x: 0, y: -shift, width: side, height: side),
+                        from: .zero, operation: .sourceOver, fraction: 1.0)
             return true
         }
     }()
