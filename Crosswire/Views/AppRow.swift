@@ -17,40 +17,45 @@
 //
 
 import SwiftUI
+import AppKit
 import CrosswireKit
 
-/// One row in the library list. Click anywhere on the row to run the entry's
-/// primary program (the row IS the run affordance — that's its job). The
-/// gear button on the right opens settings; it's smaller and secondary.
+/// One row in the library list. The discrete "Launch" button on the right is
+/// the run affordance; clicking the row body opens the entry's detail view.
+/// Right-click exposes the full set of per-entry actions.
 struct AppRow: View {
     @ObservedObject var bottle: Bottle
-    /// Tap on the row body. Currently routed to onRun by ContentView so the
-    /// row's primary affordance is "click to run." Kept as a separate
-    /// callback so ContentView can rewire it (e.g. to a future selection
-    /// model) without touching this view.
-    let onPrimaryAction: () -> Void
+    /// Run the entry's primary program (the Launch button, and the context
+    /// menu's Launch item).
     let onRun: () -> Void
+    /// Run a specific program chosen from the multi-launcher popover.
     let onRunSpecific: (Program) -> Void
-    let onOpenSettings: () -> Void
+    /// Open the entry's detail view (row-body click + "Show Details"). Today
+    /// this is the per-app settings sheet; Section 2 swaps it for an inline
+    /// `.entryDetail` destination.
+    let onShowDetails: () -> Void
+    /// Remove the entry (context menu "Uninstall…"). ContentView owns the
+    /// confirmation + bottle-list mutation.
+    let onUninstall: () -> Void
 
     @State private var showProgramMenu: Bool = false
     @State private var hovered: Bool = false
+    @State private var showRuntimesSheet: Bool = false
+    @State private var isRenaming: Bool = false
+    @State private var nameDraft: String = ""
+    @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 14) {
             AppTileIcon(name: bottle.displayName)
             VStack(alignment: .leading, spacing: 3) {
-                Text(bottle.displayName)
-                    .font(CrosswireTheme.Typography.entryName)
-                    .foregroundStyle(CrosswireTheme.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                nameField
                 Text(secondaryLine)
                     .font(CrosswireTheme.Typography.entryMeta)
                     .foregroundStyle(CrosswireTheme.textSecondary)
             }
             Spacer(minLength: 12)
-            controls
+            launchButton
         }
         .padding(.horizontal, 20)
         .frame(height: CrosswireTheme.Layout.libraryRowHeight)
@@ -62,13 +67,51 @@ struct AppRow: View {
         .scaleEffect(hovered ? 1.005 : 1.0)
         .animation(CrosswireTheme.Motion.hover, value: hovered)
         .onHover { hovered = $0 }
-        .onTapGesture { onPrimaryAction() }
+        .onTapGesture { if !isRenaming { onShowDetails() } }
+        .contextMenu { contextMenu }
         .opacity(bottle.isAvailable ? 1.0 : 0.5)
+        .sheet(isPresented: $showRuntimesSheet) {
+            CommonRuntimesView(bottle: bottle)
+        }
         .onAppear {
             if bottle.isAvailable && bottle.programs.isEmpty {
                 bottle.updateInstalledPrograms()
             }
         }
+    }
+
+    /// Entry name, or an inline rename field when the user picks Rename from
+    /// the context menu. Mirrors the sheet's rename: persists to
+    /// `appDisplayName`; empty input clears the override.
+    @ViewBuilder
+    private var nameField: some View {
+        if isRenaming {
+            TextField("App name", text: $nameDraft)
+                .textFieldStyle(.plain)
+                .font(CrosswireTheme.Typography.entryName)
+                .foregroundStyle(CrosswireTheme.textPrimary)
+                .focused($nameFieldFocused)
+                .onSubmit { commitRename() }
+                .onExitCommand { isRenaming = false }
+        } else {
+            Text(bottle.displayName)
+                .font(CrosswireTheme.Typography.entryName)
+                .foregroundStyle(CrosswireTheme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    @ViewBuilder
+    private var contextMenu: some View {
+        Button { onRun() } label: { Label("Launch", systemImage: "play.fill") }
+            .disabled(!canLaunch)
+        Button { onShowDetails() } label: { Label("Show Details", systemImage: "info.circle") }
+        Button { beginRename() } label: { Label("Rename", systemImage: "pencil") }
+        Button { showRuntimesSheet = true } label: { Label("Check Dependencies", systemImage: "shippingbox") }
+        Button { revealInFinder() } label: { Label("Show in Finder", systemImage: "folder") }
+        Divider()
+        Button(role: .destructive) { onUninstall() } label: { Label("Uninstall…", systemImage: "trash") }
     }
 
     /// The metadata line under the entry name. Currently:
@@ -81,67 +124,75 @@ struct AppRow: View {
         return "Never launched"
     }
 
+    private var canLaunch: Bool {
+        !bottle.programs.isEmpty && bottle.isAvailable
+    }
+
+    /// Discrete blue "Launch" pill. With a single launcher it runs directly;
+    /// with several it opens the picker popover. It's an explicit interactive
+    /// child, so it blocks the row-body tap underneath it.
     @ViewBuilder
-    private var controls: some View {
-        HStack(spacing: 8) {
-            playButton
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(CrosswireTheme.textSecondary)
-                    .frame(width: 28, height: 28)
+    private var launchButton: some View {
+        Group {
+            if bottle.userVisiblePrograms.count > 1 {
+                Button { showProgramMenu = true } label: { launchLabel }
+                    .popover(isPresented: $showProgramMenu, arrowEdge: .top) {
+                        programPickerPopover
+                    }
+            } else {
+                Button { onRun() } label: { launchLabel }
+                    .disabled(!canLaunch)
             }
-            .buttonStyle(.borderless)
-            .help("Settings")
         }
-        // Buttons are explicit interactive children — they must not let the
-        // row's `onTapGesture` fire underneath them.
+        .buttonStyle(.plain)
+        .help("Launch")
+        .accessibilityLabel("Launch \(bottle.displayName)")
         .onTapGesture {}
     }
 
     @ViewBuilder
-    private var playButton: some View {
-        let visible = bottle.userVisiblePrograms
-        if visible.count > 1 {
-            Button {
-                showProgramMenu = true
-            } label: {
-                playLabel
-            }
-            .buttonStyle(.borderless)
-            .help("Run")
-            .popover(isPresented: $showProgramMenu, arrowEdge: .top) {
-                programPickerPopover
-            }
-        } else {
-            Button {
-                onRun()
-            } label: {
-                playLabel
-            }
-            .buttonStyle(.borderless)
-            .disabled(bottle.programs.isEmpty || !bottle.isAvailable)
-            .help("Run")
+    private var launchLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "play.fill")
+                .font(.system(size: 11, weight: .semibold))
+            Text("Launch")
+                .font(CrosswireTheme.Typography.buttonPrimary)
+        }
+        .foregroundStyle(CrosswireTheme.textOnAccent)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(launchFill)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private var launchFill: Color {
+        guard canLaunch else { return CrosswireTheme.accent.opacity(0.30) }
+        return hovered ? CrosswireTheme.accentHover : CrosswireTheme.accent
+    }
+
+    // MARK: - Context-menu actions
+
+    private func beginRename() {
+        nameDraft = bottle.displayName
+        isRenaming = true
+        DispatchQueue.main.async { nameFieldFocused = true }
+    }
+
+    private func commitRename() {
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        isRenaming = false
+        if trimmed.isEmpty {
+            bottle.settings.appDisplayName = nil
+        } else if trimmed != bottle.displayName {
+            bottle.settings.appDisplayName = trimmed
         }
     }
 
-    /// Play affordance. Larger + more prominent than before per Brief 2 —
-    /// 34pt circle, accent-blue fill on row hover, soft accent-tinted ring
-    /// at rest so it always reads as "the run button" even before hover.
-    @ViewBuilder
-    private var playLabel: some View {
-        Image(systemName: "play.fill")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(hovered ? CrosswireTheme.textOnAccent : CrosswireTheme.accent)
-            .frame(width: 34, height: 34)
-            .background(
-                Circle()
-                    .fill(hovered ? CrosswireTheme.accent : CrosswireTheme.accent.opacity(0.12))
-            )
-            .overlay(
-                Circle()
-                    .strokeBorder(CrosswireTheme.accent.opacity(hovered ? 0 : 0.25), lineWidth: 1)
-            )
+    private func revealInFinder() {
+        NSWorkspace.shared.activateFileViewerSelecting([bottle.url])
     }
 
     private var programPickerPopover: some View {

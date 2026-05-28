@@ -318,12 +318,12 @@ struct ContentView: View {
                     ForEach(filteredBottles) { bottle in
                         AppRow(
                             bottle: bottle,
-                            onPrimaryAction: { runPrimary(for: bottle) },
                             onRun: { runPrimary(for: bottle) },
                             onRunSpecific: { program in
                                 run(program: program, bottle: bottle)
                             },
-                            onOpenSettings: { settingsBottle = bottle }
+                            onShowDetails: { settingsBottle = bottle },
+                            onUninstall: { uninstall(bottle) }
                         )
                     }
                 }
@@ -434,6 +434,25 @@ struct ContentView: View {
             setupStartingStage = .engineSetup
             showSetup = true
         }
+    }
+
+    /// Confirm + remove an entry from the library (context-menu "Uninstall…").
+    /// Deletes the bottle's files, drops it from the persisted path list, and
+    /// reloads. Mirrors the per-app sheet's delete so both entry points behave
+    /// identically.
+    @MainActor
+    private func uninstall(_ bottle: Bottle) {
+        let alert = NSAlert()
+        alert.messageText = "Uninstall \(bottle.displayName)?"
+        alert.informativeText = "This removes the app's files and cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        try? FileManager.default.removeItem(at: bottle.url)
+        bottleVM.bottlesList.paths.removeAll { $0 == bottle.url }
+        bottleVM.loadBottles()
     }
 }
 
