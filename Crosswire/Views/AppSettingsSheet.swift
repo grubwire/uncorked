@@ -282,13 +282,6 @@ struct AppSettingsSheet: View {
     }
 
     private func pickAdHocExecutable() {
-        // NOTE(backlog): this path does NOT invoke JavaAppDetector. If the
-        // user picks a self-contained JavaFX launcher here (rather than via
-        // the create-new-bottle install flow), the per-program plist + the
-        // bottle's dwrite=builtin override are never seeded automatically.
-        // Workaround: install Java apps through "Install Windows App" so a
-        // fresh bottle is created. Fix is to call JavaAppDetector.applyDefaults
-        // here too, gated on first-time selection per .exe.
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -303,6 +296,12 @@ struct AppSettingsSheet: View {
             guard result == .OK, let url = panel.urls.first else { return }
             Task { @MainActor in
                 NSApp.miniaturizeAll(nil)
+                // Mirror the install-flow Java-app handling: seeds the
+                // _JAVA_OPTIONS plist and the bottle's dwrite=builtin
+                // override on the first ad-hoc launch of a self-contained
+                // JavaFX exe. Both writes are idempotent (skip-if-present),
+                // so subsequent launches no-op.
+                await JavaAppDetector.applyDefaultsIfNeeded(forExeAt: url, in: bottle)
                 do {
                     if url.pathExtension == "bat" {
                         try await Wine.runBatchFile(url: url, bottle: bottle)
