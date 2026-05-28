@@ -72,6 +72,8 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(CrosswireTheme.backgroundGradient.ignoresSafeArea())
+        .navigationTitle("Crosswire")
+        .toolbar { crosswireToolbar }
         .sheet(item: $settingsBottle) { bottle in
             // Per-entry settings still uses .sheet for this commit. Section 2
             // of the brief converts it to inline routing via .entryDetail.
@@ -119,74 +121,104 @@ struct ContentView: View {
     /// readable.
     private var libraryRoot: some View {
         VStack(spacing: 0) {
-            header
             actionRow
             content
         }
     }
 
-    // MARK: - Header
+    // MARK: - Toolbar (native unified, replaces the old custom header)
 
-    /// "Crosswire" wordmark, gear-icon settings entry on the right. Gear now
-    /// routes to the inline `.settings` destination (was SettingsLink → a
-    /// separate macOS window); Cmd+, kept via `.keyboardShortcut` so the
-    /// standard Mac affordance still works.
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text("Crosswire")
-                .font(CrosswireTheme.Typography.display)
-                .foregroundStyle(CrosswireTheme.textPrimary)
-            Spacer()
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    route = .settings
+    /// Native unified toolbar. Leading: brand icon + chevron menu (Settings /
+    /// About / Check for Updates / Quit). The inline window title ("Crosswire")
+    /// is set via `.navigationTitle` and renders next to the traffic lights.
+    /// Trailing primary-action group: sparkle (What's New, future), bell
+    /// (Notifications, future), gear (Settings), and the prominent blue "+"
+    /// install button — the primary action, visually distinct from the
+    /// placeholder symbols.
+    /// App icon redrawn into a genuinely 18pt bitmap for the leading toolbar
+    /// menu. Neither `.resizable().frame()` nor setting `.size` on a copy
+    /// constrains the render inside a toolbar `Menu` label — SwiftUI keeps the
+    /// source's full-size representations and the icon bleeds over the content
+    /// below. Redrawing produces an image whose intrinsic size really is 18pt.
+    private static let brandToolbarIcon: NSImage = {
+        let side: CGFloat = 18
+        let source = NSApplication.shared.applicationIconImage ?? NSImage()
+        let image = NSImage(size: NSSize(width: side, height: side))
+        image.lockFocus()
+        source.draw(in: NSRect(x: 0, y: 0, width: side, height: side),
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: 1.0)
+        image.unlockFocus()
+        return image
+    }()
+
+    @ToolbarContentBuilder
+    private var crosswireToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Menu {
+                Button("Settings…") {
+                    withAnimation(.easeInOut(duration: 0.2)) { route = .settings }
                 }
+                Button("About Crosswire") { CrosswireApp.openAboutWindow() }
+                Button("Check for Updates…") { sparkleUpdater?.checkForUpdates() }
+                Divider()
+                Button("Quit Crosswire") { NSApp.terminate(nil) }
+            } label: {
+                Image(nsImage: Self.brandToolbarIcon)
+            }
+            .menuIndicator(.visible)
+            .help("Crosswire")
+            .accessibilityLabel("Crosswire menu")
+        }
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                // What's New — placeholder, non-functional this pass.
+            } label: {
+                Image(systemName: "sparkles")
+            }
+            .help("What’s New")
+            .accessibilityLabel("What’s New")
+
+            Button {
+                // Notifications — placeholder, non-functional this pass.
+            } label: {
+                Image(systemName: "bell")
+            }
+            .help("Notifications")
+            .accessibilityLabel("Notifications")
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { route = .settings }
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(CrosswireTheme.textSecondary)
-                    .contentShape(Rectangle())
-                    .padding(4)
             }
-            .buttonStyle(.borderless)
             .keyboardShortcut(",", modifiers: .command)
             .help("Settings (⌘,)")
+            .accessibilityLabel("Settings")
+
+            Button(action: installWindowsApp) {
+                Label("Install", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(CrosswireTheme.accent)
+            .help("Install a Windows game or app")
+            .accessibilityLabel("Install a Game or App")
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 22)
-        .padding(.bottom, 16)
     }
 
-    // MARK: - Action row (CTA + search)
+    // MARK: - Action row (search)
 
-    /// Primary CTA "Install a Game or App" + library search. The CTA is the
-    /// most important affordance in the app (it's how anything gets into
-    /// the library at all); it gets the accent blue, the + glyph, and the
-    /// bigger height so it reads as obvious-and-primary.
+    /// Library search. The "Install a Game or App" CTA moved to the toolbar's
+    /// trailing primary-action group (Commit 2); this row now just hosts the
+    /// search field below the toolbar.
     private var actionRow: some View {
         HStack(spacing: 12) {
-            Button(action: installWindowsApp) {
-                HStack(spacing: 7) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("Install a Game or App")
-                        .font(CrosswireTheme.Typography.buttonPrimary)
-                }
-                .foregroundStyle(CrosswireTheme.textOnAccent)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(CrosswireTheme.accent)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .help("Install a Windows game or app")
-
             librarySearchField
         }
         .padding(.horizontal, 24)
+        .padding(.top, 16)
         .padding(.bottom, 18)
     }
 

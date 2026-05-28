@@ -52,6 +52,10 @@ struct CrosswireApp: App {
                     }
                 }
         }
+        // Native unified toolbar: inline title at the leading edge, larger
+        // bold controls, and free compact-on-narrow behavior. Replaces the
+        // old custom header HStack (Brief 2 / Commit 2, HIG alignment).
+        .windowToolbarStyle(.unifiedCompact)
         // Don't ask me how this works, it just does
         .handlesExternalEvents(matching: ["{same path of URL?}"])
         .commands {
@@ -108,7 +112,7 @@ struct CrosswireApp: App {
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About Crosswire") {
-                    openAboutWindow()
+                    CrosswireApp.openAboutWindow()
                 }
             }
             CommandGroup(replacing: .help) {
@@ -129,7 +133,7 @@ struct CrosswireApp: App {
                 }
                 Divider()
                 Button("Diagnostics...") {
-                    openDiagnosticsWindow()
+                    CrosswireApp.openDiagnosticsWindow()
                 }
             }
         }
@@ -143,7 +147,7 @@ struct CrosswireApp: App {
 
     // MARK: - Window helpers
 
-    @MainActor private func openAboutWindow() {
+    @MainActor static func openAboutWindow() {
         let existing = NSApp.windows.first { $0.title == "About Crosswire" }
         if let existingWindow = existing {
             existingWindow.makeKeyAndOrderFront(nil)
@@ -162,7 +166,7 @@ struct CrosswireApp: App {
         window.makeKeyAndOrderFront(nil)
     }
 
-    @MainActor private func openDiagnosticsWindow() {
+    @MainActor static func openDiagnosticsWindow() {
         let existing = NSApp.windows.first { $0.title == "Diagnostics" }
         if let existingWindow = existing {
             existingWindow.makeKeyAndOrderFront(nil)
