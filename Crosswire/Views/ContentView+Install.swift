@@ -106,7 +106,6 @@ extension ContentView {
         } else {
             provisioningMessage = "Running installer..."
         }
-        NSApp.miniaturizeAll(nil)
         var installerError: Error?
         do {
             // runInstaller uses direct `wine <path>` invocation (not
@@ -282,7 +281,6 @@ extension ContentView {
     }
 
     func run(program: Program, bottle: Bottle) {
-        NSApp.miniaturizeAll(nil)
         Task(priority: .userInitiated) {
             do {
                 try await Wine.runProgram(at: program.url, bottle: bottle)

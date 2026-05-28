@@ -271,7 +271,6 @@ struct AppSettingsSheet: View {
     }
 
     private func runProgram(_ program: Program) {
-        NSApp.miniaturizeAll(nil)
         Task(priority: .userInitiated) {
             do {
                 try await Wine.runProgram(at: program.url, bottle: bottle)
@@ -308,7 +307,6 @@ struct AppSettingsSheet: View {
         panel.begin { result in
             guard result == .OK, let url = panel.urls.first else { return }
             Task { @MainActor in
-                NSApp.miniaturizeAll(nil)
                 // Mirror the install-flow Java-app handling: seeds the
                 // _JAVA_OPTIONS plist and the bottle's dwrite=builtin
                 // override on the first ad-hoc launch of a self-contained
