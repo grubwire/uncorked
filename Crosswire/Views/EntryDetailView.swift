@@ -21,7 +21,7 @@ import AppKit
 import UniformTypeIdentifiers
 import CrosswireKit
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 /// Full-bleed inline per-entry detail shown when `AppRoute == .entryDetail`.
 /// Slides in over the library (same pattern as inline Settings); the back
 /// chevron returns. Replaces the old detached per-app settings sheet.
@@ -43,12 +43,13 @@ struct EntryDetailView: View {
     @State private var isRenaming: Bool = false
     @State private var nameDraft: String = ""
     @State private var showAdvanced: Bool = false
+    @State private var launchHovered: Bool = false
     @State private var primarySelection: URL?
     @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            navBar
+            InlinePanelBackBar(action: onBack)
             Divider().opacity(0.3)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -72,30 +73,6 @@ struct EntryDetailView: View {
                 bottle.updateInstalledPrograms()
             }
         }
-    }
-
-    // MARK: - Nav bar
-
-    private var navBar: some View {
-        HStack {
-            Button(action: onBack) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Library")
-                        .font(CrosswireTheme.Typography.body)
-                }
-                .foregroundStyle(CrosswireTheme.accent)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.cancelAction)
-            .help("Back to Library")
-            .accessibilityLabel("Back to Library")
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
     }
 
     // MARK: - Hero
@@ -134,9 +111,8 @@ struct EntryDetailView: View {
                 Button(action: beginRename) {
                     Image(systemName: "pencil")
                         .font(.system(size: 12))
-                        .foregroundStyle(CrosswireTheme.textSecondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(CrosswireButtonStyle(kind: .plain, tint: CrosswireTheme.textSecondary))
                 .help("Rename")
                 .accessibilityLabel("Rename")
             }
@@ -155,6 +131,11 @@ struct EntryDetailView: View {
         !bottle.programs.isEmpty && bottle.isAvailable
     }
 
+    private var launchFill: Color {
+        guard canLaunch else { return CrosswireTheme.accent.opacity(0.30) }
+        return launchHovered ? CrosswireTheme.accentHover : CrosswireTheme.accent
+    }
+
     private var launchButton: some View {
         Button(action: onRun) {
             HStack(spacing: 8) {
@@ -168,12 +149,14 @@ struct EntryDetailView: View {
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(canLaunch ? CrosswireTheme.accent : CrosswireTheme.accent.opacity(0.30))
+                    .fill(launchFill)
             )
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!canLaunch)
+        .onHover { launchHovered = $0 && canLaunch }
+        .animation(CrosswireTheme.Motion.hover, value: launchHovered)
         .accessibilityLabel("Launch \(bottle.displayName)")
     }
 
@@ -200,20 +183,10 @@ struct EntryDetailView: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .medium))
                 Text(title)
-                    .font(CrosswireTheme.Typography.buttonLabel)
             }
-            .foregroundStyle(destructive ? CrosswireTheme.danger : CrosswireTheme.textPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(CrosswireTheme.rowSurface)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CrosswireButtonStyle(kind: destructive ? .destructive : .secondary, fillWidth: true))
         .accessibilityLabel(title)
     }
 
@@ -346,17 +319,12 @@ struct EntryDetailView: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 12))
-                    .foregroundStyle(CrosswireTheme.textSecondary)
                     .frame(width: 16)
                 Text(title)
-                    .font(CrosswireTheme.Typography.body)
-                    .foregroundStyle(CrosswireTheme.textPrimary)
                 Spacer()
             }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CrosswireButtonStyle(kind: .plain, fillWidth: true))
         .accessibilityLabel(title)
     }
 
@@ -407,4 +375,4 @@ struct EntryDetailView: View {
         }
     }
 }
-// swiftlint:enable type_body_length file_length
+// swiftlint:enable type_body_length
