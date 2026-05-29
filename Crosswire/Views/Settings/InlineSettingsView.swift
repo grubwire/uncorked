@@ -22,15 +22,10 @@ import CrosswireKit
 import AppKit
 
 /// Full-bleed inline settings view shown when `AppRoute == .settings`. Slides
-/// in over the library view; Done returns. Replaces the prior standalone
-/// SwiftUI `Settings` scene (separate window). Battle.net pattern: left
-/// sidebar with section nav, right content pane, version chip bottom-left,
-/// Done button bottom-right.
-///
-/// Content stays largely the same as the prior `SettingsView` in this
-/// commit — the per-section content polish (Section 3 of the brief) is a
-/// follow-up commit that re-labels toggles, hides container paths,
-/// rebuilds About, etc. This commit is purely the structural conversion.
+/// in over the library and exits via the shared "‹ Library" back bar — the
+/// same navigation affordance as the per-app detail view (these are inline
+/// destinations, not modal dialogs). Left sidebar with section nav + version
+/// chip; right content pane where every section flows into one shared layout.
 struct InlineSettingsView: View {
     let updater: SPUUpdater?
     var onDone: () -> Void
@@ -38,6 +33,15 @@ struct InlineSettingsView: View {
     // Optional to satisfy `List(selection:)` single-selection binding. nil is
     // treated as `.general` when resolving content.
     @State private var selectedSection: SettingsSection? = .general
+
+    /// One layout frame shared by every pane so switching sections never makes
+    /// the title or content jump (identical insets + rhythm).
+    private enum PaneLayout {
+        static let leftInset: CGFloat = 28
+        static let topInset: CGFloat = 24
+        static let rhythm: CGFloat = 16
+        static let maxWidth: CGFloat = 480
+    }
 
     enum SettingsSection: String, CaseIterable, Identifiable {
         case general = "General"
@@ -66,66 +70,56 @@ struct InlineSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            titleBar
+            InlinePanelBackBar(action: onDone)
             Divider().opacity(0.3)
             HStack(spacing: 0) {
                 sidebar
                 Divider().opacity(0.3)
                 content
             }
-            Divider().opacity(0.3)
-            footer
         }
         // Transient overlay → material blur over the library shell, per the
         // materials-vs-branded-hex rule.
         .background(.regularMaterial)
     }
 
-    // MARK: - Title bar
-
-    private var titleBar: some View {
-        HStack {
-            Text("Settings")
-                .font(CrosswireTheme.Typography.title)
-                .foregroundStyle(CrosswireTheme.textPrimary)
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 22)
-        .padding(.bottom, 16)
-    }
-
     // MARK: - Sidebar
 
-    /// Native sidebar `List` — inherits sidebar material + vibrancy, free
-    /// keyboard navigation, resize and accessibility. The system renders the
-    /// selection highlight, and since the project accent is Crosswire blue the
-    /// selected row is already an on-brand blue pill — so we let the native
-    /// selection stand on its own (no custom accent bar or background).
+    /// "SETTINGS" label, native section List, and the version chip pinned
+    /// bottom-left. Native `.sidebar` selection renders the on-brand blue pill.
     private var sidebar: some View {
-        List(selection: $selectedSection) {
-            // `id: \.self` so each row's selection identity is the
-            // `SettingsSection` value itself, matching the `SettingsSection?`
-            // binding. Relying on `Identifiable.id` (a String here) would make
-            // the selection type mismatch and silently never update.
-            ForEach(SettingsSection.allCases, id: \.self) { section in
-                sidebarRow(section: section)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Settings")
+                .font(.system(size: 11, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(CrosswireTheme.textSecondary)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+            List(selection: $selectedSection) {
+                // `id: \.self` so each row's selection identity is the
+                // `SettingsSection` value itself, matching the binding.
+                ForEach(SettingsSection.allCases, id: \.self) { section in
+                    Label {
+                        Text(section.rawValue)
+                            .font(CrosswireTheme.Typography.body)
+                    } icon: {
+                        Image(systemName: section.icon)
+                            .font(.system(size: 13, weight: .regular))
+                    }
+                }
             }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            Text(versionString)
+                .font(CrosswireTheme.Typography.entryMeta)
+                .foregroundStyle(CrosswireTheme.textTertiary)
+                .textSelection(.enabled)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
         .frame(width: 200)
-    }
-
-    @ViewBuilder
-    private func sidebarRow(section: SettingsSection) -> some View {
-        Label {
-            Text(section.rawValue)
-                .font(CrosswireTheme.Typography.body)
-        } icon: {
-            Image(systemName: section.icon)
-                .font(.system(size: 13, weight: .regular))
-        }
     }
 
     // MARK: - Content pane
@@ -133,106 +127,49 @@ struct InlineSettingsView: View {
     @ViewBuilder
     private var content: some View {
         ScrollView {
-            Group {
-                switch selectedSection ?? .general {
-                case .general:  generalSection
-                case .updates:  updatesSection
-                case .privacy:  privacySection
-                case .about:    aboutSection
-                case .advanced: advancedSection
-                }
+            switch selectedSection ?? .general {
+            case .general:  settingsPane("General") { SettingsGeneralGroup() }
+            case .updates:  settingsPane("Updates") { SettingsUpdatesGroup(updater: updater) }
+            case .privacy:  settingsPane("Privacy") { paneText(privacyBody) }
+            case .about:    settingsPane("About") { SettingsAboutGroup() }
+            case .advanced: settingsPane("Advanced") { paneText(advancedBody) }
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 22)
         }
         .frame(maxWidth: .infinity)
     }
 
+    /// The one content-layout container every pane flows into.
     @ViewBuilder
-    private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("General")
-            SettingsGeneralGroup()
+    private func settingsPane(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: PaneLayout.rhythm) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(CrosswireTheme.textPrimary)
+            content()
         }
+        .frame(maxWidth: PaneLayout.maxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, PaneLayout.leftInset)
+        .padding(.trailing, 24)
+        .padding(.top, PaneLayout.topInset)
+        .padding(.bottom, 24)
     }
 
-    @ViewBuilder
-    private var updatesSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("Updates")
-            SettingsUpdatesGroup(updater: updater)
-        }
-    }
-
-    @ViewBuilder
-    private var privacySection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("Privacy")
-            Text(
-                "Crash reporting and other privacy controls will live here in a "
-                + "future release. None of your activity is shared today."
-            )
+    private func paneText(_ text: String) -> some View {
+        Text(text)
             .font(CrosswireTheme.Typography.body)
             .foregroundStyle(CrosswireTheme.textSecondary)
-            .frame(maxWidth: 420, alignment: .leading)
-        }
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder
-    private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("About")
-            SettingsAboutGroup()
-        }
+    private var privacyBody: String {
+        "Crash reporting and other privacy controls will live here in a "
+        + "future release. None of your activity is shared today."
     }
 
-    @ViewBuilder
-    private var advancedSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("Advanced")
-            Text(
-                "Power-user controls coming soon. Per-app advanced settings "
-                + "live in each app's detail view — click an app in your library."
-            )
-            .font(CrosswireTheme.Typography.body)
-            .foregroundStyle(CrosswireTheme.textSecondary)
-            .frame(maxWidth: 420, alignment: .leading)
-        }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(CrosswireTheme.textPrimary)
-    }
-
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack {
-            Text(versionString)
-                .font(CrosswireTheme.Typography.entryMeta)
-                .foregroundStyle(CrosswireTheme.textTertiary)
-                .textSelection(.enabled)
-            Spacer()
-            Button("Done") { onDone() }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 8)
-                .foregroundStyle(CrosswireTheme.textOnAccent)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(CrosswireTheme.accent)
-                )
-                .font(CrosswireTheme.Typography.buttonPrimary)
-                // Esc dismisses. Return is intentionally NOT bound — the
-                // sidebar List below already owns Return for navigating
-                // sections, and `.defaultAction` would let the List
-                // intercept the Done shortcut first.
-                .keyboardShortcut(.cancelAction)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
+    private var advancedBody: String {
+        "Power-user controls coming soon. Per-app advanced settings live in "
+        + "each app's detail view — click an app in your library."
     }
 
     private var versionString: String {
@@ -244,15 +181,14 @@ struct InlineSettingsView: View {
 
 // MARK: - Group views
 
-/// General settings: quit-on-terminate behavior and the app-data location.
-/// The raw container path is intentionally hidden — "Show in Finder" reveals
-/// it instead, and "Change…" relocates where new apps install.
+/// General settings: quit-on-terminate behavior and the app-data location
+/// (a labeled section — no sub-card; "Show in Finder" reveals the path).
 struct SettingsGeneralGroup: View {
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Toggle("Quit running apps when Crosswire quits", isOn: $killOnTerminate)
                 .tint(CrosswireTheme.accent)
                 .font(CrosswireTheme.Typography.body)
@@ -268,7 +204,7 @@ struct SettingsGeneralGroup: View {
                     Button("Show in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting([defaultBottleLocation])
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(CrosswireButtonStyle(kind: .secondary))
                     Button("Change…") {
                         let panel = NSOpenPanel()
                         panel.canChooseFiles = false
@@ -282,18 +218,11 @@ struct SettingsGeneralGroup: View {
                             }
                         }
                     }
-                    .buttonStyle(.bordered)
-                    Spacer()
+                    .buttonStyle(CrosswireButtonStyle(kind: .secondary))
                 }
                 .padding(.top, 2)
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(CrosswireTheme.surface)
-            )
         }
-        .frame(maxWidth: 480, alignment: .leading)
     }
 }
 
@@ -306,7 +235,7 @@ struct SettingsUpdatesGroup: View {
     let updater: SPUUpdater?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Toggle("Automatically check for Crosswire app updates", isOn: $crosswireUpdate)
                 .tint(CrosswireTheme.accent)
                 .font(CrosswireTheme.Typography.body)
@@ -316,16 +245,12 @@ struct SettingsUpdatesGroup: View {
                 .font(CrosswireTheme.Typography.body)
                 .foregroundStyle(CrosswireTheme.textPrimary)
             if let updater {
-                HStack {
-                    Text("Check now")
-                        .font(CrosswireTheme.Typography.body)
-                        .foregroundStyle(CrosswireTheme.textPrimary)
-                    Spacer()
-                    SparkleView(updater: updater)
-                }
+                // SparkleView is a plain Button; the shared style propagates
+                // into it so its hover matches every other action chip.
+                SparkleView(updater: updater)
+                    .buttonStyle(CrosswireButtonStyle(kind: .secondary))
             }
         }
-        .frame(maxWidth: 480, alignment: .leading)
     }
 }
 
@@ -336,7 +261,7 @@ struct SettingsAboutGroup: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
@@ -352,13 +277,12 @@ struct SettingsAboutGroup: View {
                 }
                 Spacer()
             }
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
                 aboutLink("GitHub", "https://github.com/grubwire/Crosswire")
                 aboutLink("Crosswire Website", "https://grubwire.io")
                 aboutLink("Report an Issue", "https://github.com/grubwire/Crosswire/issues")
             }
         }
-        .frame(maxWidth: 480, alignment: .leading)
     }
 
     @ViewBuilder
@@ -370,12 +294,9 @@ struct SettingsAboutGroup: View {
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 12))
                 Text(title)
-                    .font(CrosswireTheme.Typography.body)
             }
-            .foregroundStyle(CrosswireTheme.accent)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CrosswireButtonStyle(kind: .plain, tint: CrosswireTheme.accent))
         .accessibilityLabel(title)
     }
 
