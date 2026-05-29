@@ -100,16 +100,32 @@ public class Wine {
         )
     }
 
-    /// Execute a `wine start /unix {url}` command returning the output result.
+    /// Execute a `wine start {url}` command returning the output result.
     /// Per-program plist (Program Settings/<exe>.plist) env / locale / args are auto-merged.
     /// Caller-supplied `environment` keys and non-empty `args` override the plist.
     ///
     /// Returns a `ProgramRunReport` describing the exit. Also posts
     /// `.crosswireProgramDidExit` on `NotificationCenter.default` so the
     /// app's `FailureWatcher` can surface a dialog on abnormal exits.
+    ///
+    /// `captureDiagnostics` controls the launch mode:
+    /// - `false` (default): `wine start /unix <path>` — detached. The app is
+    ///   reparented to wineserver, so it survives Crosswire quitting, but the
+    ///   foreground `start` process exits within seconds and the per-run log
+    ///   stops capturing there. The report's `exitCode` is `start`'s, not the
+    ///   app's.
+    /// - `true`: direct `wine <path>` — the foreground wine process *is* the
+    ///   app and lives for its whole lifetime, so the per-run log captures the
+    ///   app's complete stdout/stderr through to crash/exit and the report's
+    ///   `exitCode` is the app's real status (so `FailureWatcher` fires on a
+    ///   real crash). Tradeoff: the app is a direct child of Crosswire and
+    ///   stops if Crosswire quits — intended for reproducing crashes (#84/#93),
+    ///   not normal launches. Mirrors `runInstaller`'s proven direct-invocation
+    ///   path (non-blocking pipe drain — no #94 hang).
     @discardableResult
     public static func runProgram(
-        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
+        at url: URL, args: [String] = [], bottle: Bottle,
+        environment: [String: String] = [:], captureDiagnostics: Bool = false
     ) async throws -> ProgramRunReport {
         var finalEnv = environment
         var finalArgs = args
@@ -129,12 +145,17 @@ public class Wine {
             try enableDXVK(bottle: bottle)
         }
 
+        let unixPath = url.path(percentEncoded: false)
+        let wineArgs = captureDiagnostics
+            ? [unixPath] + finalArgs
+            : ["start", "/unix", unixPath] + finalArgs
+
         let startedAt = Date()
         var exitCode: Int32 = 0
         var logURL: URL?
         for await output in try Self.runWineProcess(
             name: url.lastPathComponent,
-            args: ["start", "/unix", url.path(percentEncoded: false)] + finalArgs,
+            args: wineArgs,
             bottle: bottle, environment: finalEnv
         ) {
             switch output {
