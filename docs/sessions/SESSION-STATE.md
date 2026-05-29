@@ -42,18 +42,25 @@ Theme tokens: `rowSurface`, `rowSurfaceHover`, `regionBorder`,
 - **Omitted on purpose**: "Change Icon…" (no backing), DLL-overrides editor
   (none exists), engine version in detail/About. Don't ship empty editors.
 
-## ⚠️ High-priority bug found this session (own diagnosis next)
+## "Launch re-runs the installer" — MISDIAGNOSED, not a Crosswire bug (2026-05-29)
 
-**Launch re-runs the installer.** Clicking Launch on the SWG bottle ran
-`Z:\Users\nick\Downloads\SWGLegendsSetup.exe` (the setup wizard) rather than
-the installed launcher — i.e. the bottle's **primary-program resolution
-picked the installer over the installed app**. Launch re-running setup is a
-broken core action and is a bigger deal than single-instance. #95 territory
-(primary-program heuristic). Confirmed 2026-05-29 on bottle
-`BD247FEE-…` (its `appDisplayName` is "Star Wars Galaxies Legends" but the
-primary URL points at the Downloads installer). Needs a focused session:
-trace `pickUserFacingPrimary` / `finalizeAppIdentity` / how the install flow
-sets `primaryProgramURL`, and why it kept the source installer.
+Investigated and **cleared**. Last session I saw a `SWGLegendsSetup.exe`
+process and inferred Crosswire's Launch ran the installer. Three independent
+lines of evidence show that's wrong — Crosswire resolves/launches the correct
+installed launcher every time:
+1. Bottle `BD247FEE`'s persisted `primaryProgramURL` is the launcher
+   (`…/SWG Legends/SWGLegendsLauncher.exe`), not the installer.
+2. All five recent run logs show `start /unix …/SWGLegendsLauncher.exe`.
+3. `updateInstalledPrograms` enumerates only `drive_c/Program Files[ (x86)]`
+   inside the bottle, so `~/Downloads/SWGLegendsSetup.exe` can't ever be in the
+   list `runPrimary` chooses from.
+
+The `SWGLegendsSetup.exe` process was either a stale leftover from a prior
+launcher run, or the SWG launcher's own child — the launcher re-invokes its
+Downloads bootstrapper because the game is **not fully installed** (SWG dir is
+only ~237 MB: launcher + a few patch `.tre` files + `hs_err_pid228.log`, the
+#93 crash dump). That's downstream of #93 (patcher crash leaves the install
+incomplete), not a primary-resolution bug. **No Crosswire fix needed here.**
 
 ## Single-instance — needs its own pass
 
@@ -100,18 +107,19 @@ design means launches are NOT broken, just un-deduped.
   event model, store, or view behind it.
 
 ## Next-session queue (priority order)
-1. **Launch-runs-installer bug** (above) — high priority, broken core action.
-2. **Observability follow-up** — capture the detached app's *full-lifetime*
+(The former #1 "Launch-runs-installer" item was investigated and cleared —
+see the misdiagnosis section above. Not a Crosswire bug.)
+1. **Observability follow-up** — capture the detached app's *full-lifetime*
    stdout/stderr (keep a per-launch log open for the app's life, or a debug
    launch path without `start` detachment, or `WINEDEBUG` channels tee'd to a
    persistent file). **Prerequisite for #84/#93** — they're currently
    undebuggable via Crosswire's own logs (see Observability state above). Do
    this before attacking the engine bugs.
-3. **Single-instance pass** — argv-matching, solve basename collisions, verify
+2. **Single-instance pass** — argv-matching, solve basename collisions, verify
    `.regular` policy + focus end-to-end.
-4. **Light mode** — parallel light palette in `CrosswireTheme` for the
+3. **Light mode** — parallel light palette in `CrosswireTheme` for the
    persistent branded-hex shell (materials already adapt; hex doesn't).
-5. Minor: sweep `DiagnosticsView`'s `Section("Engine")` wording.
+4. Minor: sweep `DiagnosticsView`'s `Section("Engine")` wording.
 
 ## Out of scope (designed-for, not built)
 Notifications panel (bell placeholder), What's New panel (sparkle
