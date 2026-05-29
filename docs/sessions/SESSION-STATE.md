@@ -8,10 +8,13 @@ Standing constraint: **native bones, custom skin**. No user-facing strings
 mention Wine / engine / wrappers / version numbers (CLAUDE.md naming rule —
 overrides spec lines that mention "engine version").
 
-## ✅ RESOLVED: SWG #84/#93 — JVM safepoint fix (2026-05-29)
+## ✅ SWG launcher crashes FIXED (#84/#93) — in-game pending DXVK (2026-05-29)
 
 The SWG launcher's login crash (#84) and patcher crash (#93) are **fixed**
-(`3fad7e6`). The root cause was **not** Wine networking, certs, or a Wine-fork
+(`3fad7e6`) — login, content, and the full 8.4 GB game download all work with
+zero crashes. **In-game render is not yet confirmed** (the game client launches
+but shows a black screen — DXVK blocker; see "In-game attempt" below). So the
+crash class is solved; keep #84/#93 open until you can actually play. The root cause was **not** Wine networking, certs, or a Wine-fork
 gap we had to patch — it was a **JVM↔Wine thread-suspension bug**: HotSpot
 crashes with `Illegal threadstate encountered: 6` (`safepoint.cpp:712`), and
 faults in Wine's `ntdll`, when it suspends a thread mid native↔VM transition to
@@ -171,39 +174,85 @@ SWG for the first time. Results:
   **not** Crosswire config (env/plist/dwrite all correct; login works).
   Engine-level effort; out of scope per the brief.
 
+## In-game attempt + remaining blockers (2026-05-29)
+
+Drove the full path: download → install → launch the game client.
+
+- **Download completed: 8.4 GB, 202 `.tre`, `SwgClient_r.exe` present.** The
+  crash fix held the whole way — **0 new `hs_err` dumps** across a 12 hr
+  download and the client launch.
+- **Stall pattern (feeds the winsock self-recovery task):** one genuine
+  mid-download stall at **4382 MB (file 361/571)** — connections dropped to
+  `CLOSE_WAIT`/`CLOSED`, size flatlined, the patcher hung (its blocking read
+  never returned because Wine's winsock doesn't signal the dropped FIN). **One
+  restart** (kill → relaunch → re-login → Update) resumed it; it then ran to
+  completion. (A second apparent "stall" at 8577 MB was just the patcher idle
+  at *done* — re-login showed "Ready to play".) So: **1 stall, 1 restart**.
+- **Crosswire awareness: good** — bottle `primaryProgramURL` = the launcher
+  (correct: Launch runs the launcher → Play runs the client); `drive_c` now
+  contains `SwgClient_r.exe` so `updateInstalledPrograms` sees it; library row
+  shows "Star Wars Galaxies Legends".
+- **⛔ NEW BLOCKER — game client renders a BLACK SCREEN.** Clicking Play
+  launches `SwgClient_r.exe` and it **runs without crashing** (so the crash fix
+  carries into the client), CPU ~5%, but the window stays pure black (no
+  loading/login/world; focus+Enter+Space did nothing). Root cause: the client
+  renders D3D9 via **wined3d → `opengl32` → `AppleMetalOpenGLRenderer`**
+  (macOS's deprecated GL-over-Metal) — a known black-screen path. **DXVK is off
+  AND not installed** (`dxvkConfig.dxvk = false`; `Libraries/DXVK` is empty —
+  only Wine's own `d3d9.dll` exists; `enableDXVK` would fail on a missing DXVK
+  folder). MoltenVK/Vulkan itself initializes fine in-process, so the fix is to
+  **bundle/install a MoltenVK-compatible DXVK and enable it** (D3D9 → Vulkan →
+  MoltenVK → Metal). This is a real engine/setup task, not a toggle — its own
+  focused effort.
+
 ## Next-session queue (priority order)
-(Done this session: capture-path fix `72f07be`; SWG #84/#93 fix `3fad7e6`.)
-1. **Verify + close #84/#93 on GitHub**, and let the SWG patch download finish
-   / launch the game to confirm in-game works end-to-end.
-2. **Minimize the safepoint flag set** — `3fad7e6` ships the full working combo
-   (`-XX:-UseBiasedLocking -XX:GuaranteedSafepointInterval=0 -XX:-UsePerfData`);
-   confirm which are actually load-bearing (likely `-UseBiasedLocking`) so the
-   shipped default for *all* Java apps is minimal.
-3. **Single-instance pass** — argv-matching, solve basename collisions, verify
-   `.regular` policy + focus end-to-end.
-4. **Light mode** — parallel light palette in `CrosswireTheme` for the
-   persistent branded-hex shell (materials already adapt; hex doesn't).
-5. Minor: sweep `DiagnosticsView`'s `Section("Engine")` wording.
-6. (Optional) diagnostics "hard part" — live stdout/stderr capture of detached
-   re-exec'd children (the capture-path fix surfaces `hs_err`, not live output).
+(Done this session: capture-path fix `72f07be`; SWG #84/#93 crash fix `3fad7e6`;
+SWG fully downloaded + game client launches with no crash.)
+1. **DXVK for the game client (the in-game blocker)** — install a
+   MoltenVK-compatible DXVK into `Libraries/DXVK/{x64,x32}`, enable
+   `dxvkConfig.dxvk`, relaunch `SwgClient_r.exe`, confirm it renders past the
+   black screen to the in-game login/world. Until this lands, **do NOT close
+   #84/#93** — login + patching work, but in-game render is unconfirmed.
+2. **Winsock CLOSE_WAIT self-recovery** (engine task) — a dropped connection
+   leaves the JVM's socket read blocked forever (Wine doesn't deliver the FIN),
+   so the patcher hangs instead of retrying. Fix so dropped connections resume
+   without a manual launcher restart (candidates: a Wine winsock/registry
+   timeout, JVM `sun.net` socket-read timeouts, or a patcher watchdog).
+3. **Minimize the safepoint flag set** — `3fad7e6` ships the full working combo;
+   confirm which are load-bearing (likely `-XX:-UseBiasedLocking`).
+4. **Single-instance pass** — argv-matching, basename collisions, `.regular`
+   focus.
+5. **Light mode**; minor `DiagnosticsView` "Engine" wording; (optional)
+   diagnostics live-stdout capture of detached children.
+
+## Design direction (note, NOT a task)
+Future: a **health-check / remediation system** that auto-recovers from known
+failure modes (e.g. detect a download stall → auto-restart the launcher and
+resume). Build it **per-rule, only after each failure is fully diagnosed** — a
+remediation that fires on a misunderstood signal is worse than none. First
+candidate: download-stall auto-restart, pending the winsock CLOSE_WAIT
+diagnosis (#2 above).
 
 ## Out of scope (designed-for, not built)
 Notifications panel (bell placeholder), What's New panel (sparkle
 placeholder), background-install rework, icon extraction, Sentry.
 
 ## Open issues
-- **#84 / #93 — RESOLVED 2026-05-29** by the JVM safepoint flags (`3fad7e6`,
-  see the ✅ section near the top). SWG logs in, loads content, and downloads
-  the game past 1.8 GB with no crash. Should be verified + closed on GitHub.
-  (#90 and #92 closed earlier.)
+- **#84 / #93 — crash fixed, NOT yet closed.** The JVM safepoint flags
+  (`3fad7e6`) fixed the launcher crashes: SWG logs in, loads content, and
+  downloaded the full game (8.4 GB) with **zero crashes**. **Keep open** until
+  in-game render is confirmed — the game client currently launches but renders
+  a black screen (DXVK blocker, queue #1). Don't close until you can actually
+  play. (#90 and #92 closed earlier.)
 
 ## Repo state
 - Branch `main`. This session shipped: inline-panel **consistency pass**
   (`b1cc1dd`, `b184252`, `4717593`); diagnostics **capture-path fix**
-  (`72f07be`); **SWG #84/#93 fix** (`3fad7e6`); docs.
-- The SWG bottle's per-program plist `_JAVA_OPTIONS` was also updated in place
-  (data, not committed) so Crosswire's normal Launch uses the new flags now.
-- A shell-launched SWG instance is **still downloading the game** (left running
-  on purpose) — safe to let finish or quit.
-- CI: green through `4717593`; confirm on `3fad7e6`/this doc.
+  (`72f07be`); **SWG #84/#93 crash fix** (`3fad7e6`); docs.
+- The SWG bottle's per-program plist `_JAVA_OPTIONS` was updated in place (data,
+  not committed) with the safepoint flags. `dxvkConfig.dxvk` left **false**
+  (DXVK isn't installed; enabling it without the DLLs would fail a launch).
+- SWG is **fully downloaded** (8.4 GB). All SWG processes were cleaned up at
+  end of session.
+- CI: green through `4717593`; confirm on `3fad7e6` + this doc.
 - Working tree clean after the SESSION-STATE commit lands.
