@@ -188,8 +188,15 @@ struct ContentView: View {
             .menuIndicator(.visible)
             .help("Crosswire")
             .accessibilityLabel("Crosswire menu")
+            // A touch more inset from the traffic lights.
+            .padding(.leading, 6)
         }
 
+        // Secondary actions stay in their own native group (monochrome toolbar
+        // buttons). Keeping them grouped — and splitting "+ Install" into a
+        // separate item below — puts a real gap between the cluster and the
+        // prominent install CTA. Leading/trailing split is unchanged; these
+        // are all actions and belong on the trailing side.
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 // What's New — placeholder, non-functional this pass.
@@ -215,13 +222,15 @@ struct ContentView: View {
             .keyboardShortcut(",", modifiers: .command)
             .help("Settings (⌘,)")
             .accessibilityLabel("Settings")
+        }
 
-            // Labeled "+ Install" (not a bare icon) — install is the app's
-            // primary action and discoverability wins over toolbar minimalism.
-            // Suppressed when the library is empty: the centered hero CTA is
-            // the single obvious target there, so the toolbar copy would be
-            // redundant. See the spec's metrics legend.
-            if !bottleVM.bottles.isEmpty {
+        // Labeled "+ Install" (not a bare icon) — install is the app's primary
+        // action and discoverability wins over toolbar minimalism. Its own item
+        // so a group gap separates it from the secondary cluster; trailing
+        // padding keeps it off the window edge. Suppressed when the library is
+        // empty (the centered hero CTA is the single target there).
+        if !bottleVM.bottles.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
                 Button(action: installWindowsApp) {
                     Label("Install", systemImage: "plus")
                 }
@@ -230,6 +239,7 @@ struct ContentView: View {
                 .tint(CrosswireTheme.accent)
                 .help("Install a Windows game or app")
                 .accessibilityLabel("Install a Game or App")
+                .padding(.trailing, 6)
             }
         }
     }
