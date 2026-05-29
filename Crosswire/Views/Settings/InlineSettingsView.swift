@@ -152,18 +152,8 @@ struct InlineSettingsView: View {
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 18) {
             sectionHeader("General")
-            // Keep this content as-is for Section 1 (structural commit).
-            // Section 3 of the brief rewrites these labels + adds the
-            // "Show in Finder" action for App Data Location.
-            existingGeneralToggle
+            SettingsGeneralGroup()
         }
-    }
-
-    @ViewBuilder
-    private var existingGeneralToggle: some View {
-        // Defer to the original SettingsView's General toggle by reference
-        // so behaviour matches today exactly. Content cleanup is Section 3.
-        SettingsGeneralGroup()
     }
 
     @ViewBuilder
@@ -252,12 +242,11 @@ struct InlineSettingsView: View {
     }
 }
 
-// MARK: - Group views (existing-behavior wrappers for Section 1)
+// MARK: - Group views
 
-/// Wrapped copy of the original General toggles. Section 3 will replace
-/// this with cleaned-up content (relabelled defaults path with Show in
-/// Finder, theme-tinted toggle). Kept as a small wrapper so this commit is
-/// purely structural and the diff stays reviewable.
+/// General settings: quit-on-terminate behavior and the app-data location.
+/// The raw container path is intentionally hidden — "Show in Finder" reveals
+/// it instead, and "Change…" relocates where new apps install.
 struct SettingsGeneralGroup: View {
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
@@ -268,17 +257,18 @@ struct SettingsGeneralGroup: View {
                 .tint(CrosswireTheme.accent)
                 .font(CrosswireTheme.Typography.body)
                 .foregroundStyle(CrosswireTheme.textPrimary)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Default install location")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("App Data Location")
                     .font(CrosswireTheme.Typography.body)
                     .foregroundStyle(CrosswireTheme.textPrimary)
+                Text("Where your installed apps and their files are kept.")
+                    .font(CrosswireTheme.Typography.entryMeta)
+                    .foregroundStyle(CrosswireTheme.textSecondary)
                 HStack(spacing: 8) {
-                    Text(defaultBottleLocation.prettyPath())
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(CrosswireTheme.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([defaultBottleLocation])
+                    }
+                    .buttonStyle(.bordered)
                     Button("Change…") {
                         let panel = NSOpenPanel()
                         panel.canChooseFiles = false
@@ -293,21 +283,23 @@ struct SettingsGeneralGroup: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                    Spacer()
                 }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(CrosswireTheme.surface)
-                )
+                .padding(.top, 2)
             }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(CrosswireTheme.surface)
+            )
         }
         .frame(maxWidth: 480, alignment: .leading)
     }
 }
 
-/// Wrapped copy of the Updates section. Section 3 will fix the duplicate-
-/// label bug (both toggles read as "Crosswire updates" in the prior
-/// localized strings) and relabel correctly.
+/// Updates section: two independent toggles (distinct UserDefaults keys —
+/// never collapse to one). The second covers the Windows-compatibility layer;
+/// it deliberately avoids the word "engine" per the user-facing naming rule.
 struct SettingsUpdatesGroup: View {
     @AppStorage("SUEnableAutomaticChecks") var crosswireUpdate = true
     @AppStorage("checkEngineUpdates") var checkEngineUpdates = true
@@ -319,7 +311,7 @@ struct SettingsUpdatesGroup: View {
                 .tint(CrosswireTheme.accent)
                 .font(CrosswireTheme.Typography.body)
                 .foregroundStyle(CrosswireTheme.textPrimary)
-            Toggle("Automatically check for Engine updates", isOn: $checkEngineUpdates)
+            Toggle("Automatically check for Windows compatibility updates", isOn: $checkEngineUpdates)
                 .tint(CrosswireTheme.accent)
                 .font(CrosswireTheme.Typography.body)
                 .foregroundStyle(CrosswireTheme.textPrimary)
@@ -337,11 +329,14 @@ struct SettingsUpdatesGroup: View {
     }
 }
 
-/// Wrapped About panel — kept simple for Section 1; Section 3 adds the
-/// icon, Crosswire wordmark line, engine line, and links.
+/// About panel: app icon, name, version, and external links. The engine
+/// version is intentionally NOT shown — no user-facing engine/version strings
+/// (CLAUDE.md naming rule; overrides the spec line that listed it).
 struct SettingsAboutGroup: View {
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
@@ -354,24 +349,39 @@ struct SettingsAboutGroup: View {
                     Text(appVersionString)
                         .font(CrosswireTheme.Typography.body)
                         .foregroundStyle(CrosswireTheme.textSecondary)
-                    Text("Engine \(engineVersionString)")
-                        .font(CrosswireTheme.Typography.entryMeta)
-                        .foregroundStyle(CrosswireTheme.textTertiary)
                 }
                 Spacer()
             }
+            VStack(alignment: .leading, spacing: 10) {
+                aboutLink("GitHub", "https://github.com/grubwire/Crosswire")
+                aboutLink("Crosswire Website", "https://grubwire.io")
+                aboutLink("Report an Issue", "https://github.com/grubwire/Crosswire/issues")
+            }
         }
         .frame(maxWidth: 480, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func aboutLink(_ title: String, _ urlString: String) -> some View {
+        Button {
+            if let url = URL(string: urlString) { openURL(url) }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 12))
+                Text(title)
+                    .font(CrosswireTheme.Typography.body)
+            }
+            .foregroundStyle(CrosswireTheme.accent)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     private var appVersionString: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
         return build.isEmpty ? "Version \(short)" : "Version \(short) (\(build))"
-    }
-
-    private var engineVersionString: String {
-        guard let version = CrosswireEngine.engineVersion() else { return "not installed" }
-        return "\(version.major).\(version.minor).\(version.patch)"
     }
 }
