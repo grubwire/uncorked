@@ -472,6 +472,31 @@ public class Wine {
         return pids
     }
 
+    /// Best-effort: is any process whose command line mentions `needle`
+    /// currently running? Matches by argv (visible in `ps`) rather than env —
+    /// a re-exec'ing launcher forks a detached child (`ppid=1`) whose env is
+    /// hidden from `ps -E`, but whose argv still carries the launched exe name.
+    /// The diagnostics flow uses this to wait out such a child before
+    /// collecting crash artifacts. Argv basename collisions across bottles can
+    /// extend the wait but never break it (single-instance does proper
+    /// per-bottle disambiguation separately).
+    public static func isProcessRunning(matching needle: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-Aww", "-o", "command="]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return (String(data: data, encoding: .utf8) ?? "").contains(needle)
+    }
+
     /// Set AeDebug.Auto = 0 in both the 64-bit and 32-bit (Wow6432Node)
     /// registry views. Stops Wine from spawning `winedbg --auto` on every
     /// in-process crash. Critical for JVM-based apps under Wine — the HotSpot

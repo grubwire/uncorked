@@ -316,13 +316,32 @@ extension ContentView {
             return
         }
         let startedAt = Date()
+        let exeName = program.url.lastPathComponent
         Task(priority: .userInitiated) {
             let report = try? await Wine.runProgram(
                 at: program.url, bottle: bottle, captureDiagnostics: true
             )
+            // The foreground wine returns early if the app re-execs a detached
+            // child (e.g. a JVM launcher forking `javaw`). Wait until the
+            // launched exe is gone from the process list before collecting
+            // artifacts, so a crash that happens minutes after the foreground
+            // process exited still gets caught (its hs_err lands on disk).
+            await Self.waitForExit(ofExe: exeName)
             await MainActor.run {
                 presentDiagnostics(report: report, bottle: bottle, since: startedAt)
             }
+        }
+    }
+
+    /// Poll until no process mentions `exeName` in its argv, capped so a
+    /// long-running app can't hang the diagnostics flow forever. A short
+    /// initial delay lets a detached child appear before the first check.
+    private static func waitForExit(ofExe exeName: String) async {
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        let deadline = Date().addingTimeInterval(10 * 60)
+        while Date() < deadline {
+            if !Wine.isProcessRunning(matching: exeName) { return }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
         }
     }
 
@@ -333,9 +352,21 @@ extension ContentView {
         let crashDump = recentCrashDump(in: bottle, since: since)
         let alert = NSAlert()
         alert.messageText = "Diagnostics captured"
-        var info = "Captured the full run log for \(bottle.displayName)."
-        if let report { info += "\nExit code: \(report.exitCode)." }
-        if crashDump != nil { info += "\nA crash dump was written during this run." }
+        // Lead with whether a crash dump was found — that's the real evidence.
+        // The run report's exit code reflects only the foreground process,
+        // which is unreliable for apps that re-exec a detached child, so it's
+        // not surfaced here.
+        var info: String
+        if crashDump != nil {
+            info = "\(bottle.displayName) wrote a crash dump during this run — "
+                + "that's the most useful evidence for a Report."
+        } else {
+            info = "\(bottle.displayName) exited without writing a crash dump."
+        }
+        if report?.logFileURL != nil {
+            info += "\nThe run log captured the launch environment and any "
+                + "early output."
+        }
         alert.informativeText = info
         if report?.logFileURL != nil {
             alert.addButton(withTitle: "Reveal Log")
