@@ -99,9 +99,9 @@ struct InlineSettingsView: View {
 
     /// Native sidebar `List` — inherits sidebar material + vibrancy, free
     /// keyboard navigation, resize and accessibility. The system renders the
-    /// selection highlight (the project accent is Crosswire blue, so it's
-    /// on-brand); we overlay our 3pt blue left-edge accent bar on the selected
-    /// row for brand continuity. No custom selection background.
+    /// selection highlight, and since the project accent is Crosswire blue the
+    /// selected row is already an on-brand blue pill — so we let the native
+    /// selection stand on its own (no custom accent bar or background).
     private var sidebar: some View {
         List(selection: $selectedSection) {
             // `id: \.self` so each row's selection identity is the
@@ -119,17 +119,12 @@ struct InlineSettingsView: View {
 
     @ViewBuilder
     private func sidebarRow(section: SettingsSection) -> some View {
-        let isSelected = selectedSection == section
-        HStack(spacing: 10) {
-            // Battle.net signature: blue left-edge accent bar on the selected
-            // row, layered over the system selection highlight.
-            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                .fill(isSelected ? CrosswireTheme.accent : Color.clear)
-                .frame(width: 3, height: 18)
-            Image(systemName: section.icon)
-                .font(.system(size: 13, weight: .regular))
+        Label {
             Text(section.rawValue)
                 .font(CrosswireTheme.Typography.body)
+        } icon: {
+            Image(systemName: section.icon)
+                .font(.system(size: 13, weight: .regular))
         }
     }
 
