@@ -8,6 +8,32 @@ Standing constraint: **native bones, custom skin**. No user-facing strings
 mention Wine / engine / wrappers / version numbers (CLAUDE.md naming rule —
 overrides spec lines that mention "engine version").
 
+## ✅ RESOLVED: SWG #84/#93 — JVM safepoint fix (2026-05-29)
+
+The SWG launcher's login crash (#84) and patcher crash (#93) are **fixed**
+(`3fad7e6`). The root cause was **not** Wine networking, certs, or a Wine-fork
+gap we had to patch — it was a **JVM↔Wine thread-suspension bug**: HotSpot
+crashes with `Illegal threadstate encountered: 6` (`safepoint.cpp:712`), and
+faults in Wine's `ntdll`, when it suspends a thread mid native↔VM transition to
+reach a safepoint. It hit hardest on the launcher's **network/Finalizer
+threads** closing TLS connections — which is exactly why content/patch-check
+appeared to "hang on the network" (connections in `CLOSE_WAIT`) and the patcher
+died ~392 MB in. (TLS itself was always fine: 14 successful handshakes, no cert
+errors; the cacerts even has ISRG Root X1.)
+
+**Fix:** extend the seeded `_JAVA_OPTIONS` for bundled-JRE launchers to suppress
+the avoidable safepoints — `-XX:-UseBiasedLocking`,
+`-XX:+UnlockDiagnosticVMOptions -XX:GuaranteedSafepointInterval=0`,
+`-XX:-UsePerfData` (in `JavaAppDetector.recommendedJavaOptions`; also written
+into the SWG bottle's per-program plist so it applies now).
+
+**Verified live:** login works → launcher content + news load → "Update"
+becomes available → patcher downloads **past 1.8 GB** with zero crashes (it
+died at ~392 MB before). How we found it: `javax.net.debug` capture (via a
+shell launch with stderr→file, since the JVM does its own TLS, not Wine's
+schannel) caught the fatal safepoint error firing on the URL-Loader/Finalizer
+threads. Follow-ups: minimize the flag set, verify/close the GitHub issues.
+
 ## Shipped (all on `origin/main`)
 
 **Task D — redesign (prior session):** spec amendments `8a67081`; accent
@@ -146,33 +172,38 @@ SWG for the first time. Results:
   Engine-level effort; out of scope per the brief.
 
 ## Next-session queue (priority order)
-(The former #1 "Launch-runs-installer" item was cleared as a misdiagnosis.)
-1. **Fix the diagnostics capture path** (above) — poll-until-idle + surface
-   `hs_err`, so "Launch with Diagnostics…" actually delivers the crash dump for
-   re-exec'ing launchers like SWG. Prerequisite for debugging #84/#93.
-2. **Single-instance pass** — argv-matching, solve basename collisions, verify
+(Done this session: capture-path fix `72f07be`; SWG #84/#93 fix `3fad7e6`.)
+1. **Verify + close #84/#93 on GitHub**, and let the SWG patch download finish
+   / launch the game to confirm in-game works end-to-end.
+2. **Minimize the safepoint flag set** — `3fad7e6` ships the full working combo
+   (`-XX:-UseBiasedLocking -XX:GuaranteedSafepointInterval=0 -XX:-UsePerfData`);
+   confirm which are actually load-bearing (likely `-UseBiasedLocking`) so the
+   shipped default for *all* Java apps is minimal.
+3. **Single-instance pass** — argv-matching, solve basename collisions, verify
    `.regular` policy + focus end-to-end.
-3. **Light mode** — parallel light palette in `CrosswireTheme` for the
+4. **Light mode** — parallel light palette in `CrosswireTheme` for the
    persistent branded-hex shell (materials already adapt; hex doesn't).
-4. Minor: sweep `DiagnosticsView`'s `Section("Engine")` wording.
-5. (Optional) drive #93 live — click Update, let the 571-patch download run to
-   its mid-update crash; only useful once the capture-path fix lands.
+5. Minor: sweep `DiagnosticsView`'s `Section("Engine")` wording.
+6. (Optional) diagnostics "hard part" — live stdout/stderr capture of detached
+   re-exec'd children (the capture-path fix surfaces `hs_err`, not live output).
 
 ## Out of scope (designed-for, not built)
 Notifications panel (bell placeholder), What's New panel (sparkle
 placeholder), background-install rework, icon extraction, Sentry.
 
 ## Open issues
-- **#84 / #93** — SWG launcher JavaFX crashes (login click; mid-Update). Engine
-  (Wine-fork) level, not app code — need CrossOver patch diff or newer Gcenx
-  Wine. (#90 and #92 closed this cycle.)
+- **#84 / #93 — RESOLVED 2026-05-29** by the JVM safepoint flags (`3fad7e6`,
+  see the ✅ section near the top). SWG logs in, loads content, and downloads
+  the game past 1.8 GB with no crash. Should be verified + closed on GitHub.
+  (#90 and #92 closed earlier.)
 
 ## Repo state
-- Branch `main`. Recent: `captureDiagnostics` backend + "Launch with
-  Diagnostics…" (`91998ab`, `c9ffd6f`); inline-panel **consistency pass** —
-  shared back bar + button-hover style + pane layout (`b1cc1dd`, `b184252`,
-  `4717593`); plus this Brief-1 diagnostics doc.
-- Brief 1 made **no code commits** — capture-path fix is queued (#1 above),
-  pending decision; the diagnostics finding is the deliverable.
-- CI: green on `4717593` (SwiftLint + Build; CodeQL finishing).
+- Branch `main`. This session shipped: inline-panel **consistency pass**
+  (`b1cc1dd`, `b184252`, `4717593`); diagnostics **capture-path fix**
+  (`72f07be`); **SWG #84/#93 fix** (`3fad7e6`); docs.
+- The SWG bottle's per-program plist `_JAVA_OPTIONS` was also updated in place
+  (data, not committed) so Crosswire's normal Launch uses the new flags now.
+- A shell-launched SWG instance is **still downloading the game** (left running
+  on purpose) — safe to let finish or quit.
+- CI: green through `4717593`; confirm on `3fad7e6`/this doc.
 - Working tree clean after the SESSION-STATE commit lands.
