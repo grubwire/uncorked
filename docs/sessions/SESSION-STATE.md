@@ -102,6 +102,121 @@ target it renders to is confirmed working.
    doesn't change `engine-manifest.json` schema (just a new file set + new
    version). Roll-forward only; prior archives retained for rollback.
 
+## ✅ DXVK research — STOP 1 findings (2026-05-30, investigation only)
+
+Answered the three open questions before any build. Three curveballs caught
+cheaply — read these before starting the build phase.
+
+### Q1 — Which DXVK build (CURVEBALL: the obvious one dropped D3D9)
+
+**SWG is a D3D9 game** (2003-era; SwgClient_r.exe renders via D3D9 → that's the
+exact wined3d→AppleGL path that black-screens). So we need a **D3D9** Vulkan
+translator, not D3D10/11.
+
+- ❌ **Gcenx/DXVK-macOS** (the upstream-matching fork) — latest is v1.10.3
+  (2024 repack) and it **explicitly removed `d3d9.dll`** ("shouldn't be used on
+  macOS"); it's D3D10/11 only. **Unusable for SWG.**
+- ✅ **RECOMMENDED: `Sikarugir-App/d9vk`, release `v1.10.3-20250511`**
+  (async, D3D9-only, macOS-built, May 2025). Sikarugir-App is the *currently
+  active* (2026) macOS-Wine gaming toolchain (they also maintain a MoltenVK
+  fork, winetricks, a `dxvk` D3D9/10/11 source repo, and Metal-path `dxmt`/`d9mt`).
+  - Downloaded + inspected the tarball: layout is `x64/d3d9.dll` (PE32+ x86-64,
+    3.8 MB) + `x32/d3d9.dll` (PE32, 4 MB) + `dxvk.conf`. The **`x64/`+`x32/`
+    folder names exactly match what `enableDXVK` already expects** — drop-in.
+  - DXVK **1.10.3** base needs only ~Vulkan 1.1 + a handful of extensions →
+    far lower bar than DXVK 2.x (which needs Vulkan 1.3 + dynamic_rendering etc).
+  - It's an **async** fork → honors `DXVK_ASYNC=1`, which Crosswire already sets.
+- **MoltenVK compatibility CONFIRMED against the engine's own MoltenVK 1.4.1**
+  (re-checked the probe's 153-extension dump): `VK_EXT_robustness2`,
+  `VK_KHR_dynamic_rendering`, `VK_EXT_extended_dynamic_state` 1/2/3,
+  `VK_KHR_maintenance*`, `VK_EXT_vertex_attribute_divisor` all **PRESENT**.
+  Absent: `VK_EXT_graphics_pipeline_library` (DXVK falls back to sync pipeline
+  compile — more stutter, still works) and `VK_EXT_transform_feedback` (D3D9 is
+  largely fine without; matters mainly for D3D10/11 geometry/stream-out).
+  - These are the very extensions DXVK-macOS was *waiting on MoltenVK for* in
+    2023 — MoltenVK 1.4.1 now provides them, so the 2023 blocker is resolved.
+- **Fallback if d9vk-on-MoltenVK still black-screens:** Sikarugir's `d9mt`
+  (D3D9→**Metal** directly, no MoltenVK). Different engine integration (needs
+  DXMT's Metal runtime, not our Vulkan path) — only pursue if Vulkan path fails
+  at STOP 2.
+
+### Q2 — Per-bottle enable (GOOD NEWS: app side is already wired)
+
+The DLL-override is **already implemented** — and via env, not the registry:
+- `BottleSettings.environmentVariables` (BottleSettings.swift:322) sets
+  **`WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=n,b`** (native,builtin) whenever
+  `dxvk == true`, plus `DXVK_HUD` and `DXVK_ASYNC=1`. (This is the DXVK analogue
+  of the `dwrite=builtin` registry override — env-based, so it auto-reverts when
+  the toggle is off; no registry residue.)
+- `Wine.enableDXVK(bottle:)` (Wine.swift:559) copies `{x64,x32}` DLLs from
+  `Wine.dxvkFolder` into system32/syswow64 via `replaceDLLs`. Called lazily at
+  launch in `runProgram` (Wine.swift:144) and `runInstaller` (:221) when
+  `bottle.settings.dxvk` is true.
+- The Advanced **"DXVK (DirectX to Vulkan)" toggle** (EntryDetailView.swift:228,
+  ConfigView.swift:121) just binds `bottle.settings.dxvk`.
+- **So: NO app-code change is needed to wire the override.** The only thing
+  missing is the DXVK DLL *files* for `enableDXVK` to copy.
+- **CURVEBALL (the one code change required):** `Wine.dxvkFolder` =
+  `CrosswireEngine.libraryFolder/DXVK` = `…/app.Crosswire.Crosswire/`**`Libraries`**`/DXVK`
+  — a **sibling of `Engine/`, NOT inside the engine archive** (engine-bundle.yml
+  packs `engine/` → installs to `…/Engine`; it never writes `Libraries/`). So if
+  we bundle DXVK *into the engine archive*, `enableDXVK` won't find it. Resolve
+  by **one of**:
+  - (A, recommended) change `Wine.dxvkFolder` to a path *inside* the engine
+    (e.g. `engineFolder.appending("DXVK")`) — 1-line Swift change — and have
+    engine-bundle.yml drop d9vk into `/tmp/engine/DXVK/{x64,x32}`. DXVK then
+    ships, versions, signs, and installs atomically with the engine; fresh
+    installs get it automatically. (sign-engine.sh signs Mach-O only and skips
+    the PE d3d9.dlls — correct, they're Windows DLLs.)
+  - (B) keep `Libraries/DXVK` and deliver DXVK via a separate download/install
+    step (own manifest/object). More moving parts; doesn't ride the engine's
+    signed manifest. Not recommended.
+- Minor: toggling DXVK *off* after on leaves the copied DXVK DLLs on disk, but
+  without `WINEDLLOVERRIDES=native` Wine uses its compiled-in builtin d3d9 → no
+  functional effect. A `disableDXVK` restore path is a nice-to-have, not a
+  blocker.
+
+### Q3 — Promote-to-prod sequence + blockers
+
+Pipeline (all manual, human-gated — see CLAUDE.md):
+1. **`engine-bundle.yml`** (workflow_dispatch, `force=true` required — Gcenx 11.9
+   already == `engine-version.txt`, so the gate skips without force): fetch Gcenx
+   → extract to `/tmp/engine` → wrappers → patch/rebuild ntdll/wow64cpu/wineserver
+   → **[NEW STEP: drop d9vk into `/tmp/engine/DXVK/{x64,x32}`]** → `sign-engine.sh`
+   (Mach-O only; **skips DXVK PE .dlls — correct**) → boot smoke test →
+   **measure size** (`du -sk` of `/tmp/engine` — DXVK is counted automatically if
+   added before this step) → repack `engine/` as tar.xz → **sha256** →
+   `engine-manifest.json` (schemaVersion/engineVersion/upstreamTag/url/sha256/
+   sizeBytes/minAppVersion) → `sign-manifest.sh` (Ed25519) → upload artifact
+   (no auto-publish).
+2. Human tests the artifact locally.
+3. **`engine-promote-prod.yml`** (inputs: engine_tag + bundle run_id): downloads
+   artifact → uploads archive to R2 `engine/prod/archives/` → overwrites
+   `engine/prod/engine-manifest.json` + `.sig` → bumps `engine-version.txt`.
+- **BLOCKER 1 — Checkpoint D not done.** Prod promotion needs R2 stood up:
+  bucket + `data.grubwire.io` custom domain + secrets `R2_ACCOUNT_ID`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, and
+  `ENGINE_MANIFEST_SIGNING_KEY`. Until then **Phase 3 (prod promote) cannot
+  run** — but local bundle + local test (Phase 2) is unblocked.
+- **BLOCKER 2 — versioning gotcha for existing installs.** `shouldUpdateEngine`
+  (CrosswireEngine.swift:237) updates only when `local < remote` engineVersion,
+  and the manifest's `engineVersion` = the bare Gcenx tag ("11.9"). Re-bundling
+  11.9 with DXVK keeps engineVersion "11.9" → **existing 11.9 installs would NOT
+  pull the DXVK engine.** Need a Crosswire-side revision scheme (e.g. "11.9.1")
+  decoupled from the Gcenx tag, which means a small engine-bundle.yml change to
+  set engineVersion independently of upstreamTag. **Fresh installs are
+  unaffected** (first-run downloads whatever the manifest says) — so STOP 3's
+  fresh-install test works regardless; only the existing-user update path needs
+  this.
+
+### Phase 2 heads-up — SWG game files were wiped
+Reaching the 3D render path needs SWG's installed game data, which we deleted
+with bottle `BD247FEE` (rm -rf, not Trash — **not recoverable**). Phase 2 local
+test will need a **re-download of the ~8.4 GB** (with the known CLOSE_WAIT
+stall→restart pattern). The launcher gates "Play" behind a complete 571-file
+patch, so a partial install likely won't reach the client. Report the chosen
+path before burning hours.
+
 ## 🛠 Build gotcha — xcodebuild -destination fixes a rebuild hang (2026-05-29)
 
 A bare `xcodebuild -scheme Crosswire -configuration Debug -derivedDataPath …
