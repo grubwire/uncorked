@@ -38,10 +38,10 @@ struct DiagnosticsView: View {
                 DiagnosticRow(label: "Version", value: appVersion)
             }
 
-            Section("Engine") {
+            Section("Compatibility") {
                 if let state = engineState {
                     DiagnosticRow(label: "Version", value: state.engineVersion)
-                    DiagnosticRow(label: "Upstream tag", value: state.upstreamTag)
+                    DiagnosticRow(label: "Build", value: state.upstreamTag)
                 } else {
                     DiagnosticRow(label: "Version", value: "Not installed")
                 }
@@ -54,7 +54,7 @@ struct DiagnosticsView: View {
             }
 
             Section("Paths") {
-                DiagnosticRow(label: "Engine", value: CrosswireEngine.engineFolder.path)
+                DiagnosticRow(label: "Compatibility", value: CrosswireEngine.engineFolder.path)
                 DiagnosticRow(label: "Libraries", value: CrosswireEngine.libraryFolder.path)
             }
         }
