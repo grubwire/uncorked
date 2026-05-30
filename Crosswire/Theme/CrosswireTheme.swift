@@ -61,8 +61,11 @@ public enum CrosswireTheme {
     /// container (`surface`).
     public static let rowSurface = Color(hex: 0x262B34)
 
-    /// A library row under cursor hover. One step above `rowSurface`.
-    public static let rowSurfaceHover = Color(hex: 0x2A2F38)
+    /// A library row / secondary button under cursor hover. A full step above
+    /// `rowSurface` (matching the background→surface→rowSurface ramp), so the
+    /// lift is perceptible on the dark surface rather than a near-invisible
+    /// ~1.5% nudge. Preserves rowSurface's channel spacing — same tone, brighter.
+    public static let rowSurfaceHover = Color(hex: 0x323740)
 
     /// The 1px hairline around the library region container. Same tone as a
     /// row at rest, used as a quiet edge against the page gradient.
