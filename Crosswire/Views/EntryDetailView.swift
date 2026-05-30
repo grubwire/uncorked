@@ -278,8 +278,7 @@ struct EntryDetailView: View {
                             .truncationMode(.middle)
                         Spacer()
                         Button("Run") { onRunProgram(program) }
-                            .buttonStyle(.borderless)
-                            .controlSize(.small)
+                            .buttonStyle(CrosswireButtonStyle(kind: .secondary))
                     }
                 }
             }
