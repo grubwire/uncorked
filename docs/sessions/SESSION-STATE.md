@@ -62,6 +62,46 @@ inspection + a direct MoltenVK probe:
   `~/Library/Application Support/app.Crosswire.Crosswire/Engine/` (not the bare
   `…/Crosswire/Engine` in CLAUDE.md — sandbox container path).
 
+### → NEXT SESSION: DXVK bundling brief (do NOT start now — its own fresh session)
+
+This is **engine build-pipeline** work (CI/YAML/signing), a different domain
+from the app's Swift — start it fresh with research up front, not as a tail of
+this session.
+
+**The fix:** bundle a MoltenVK-compatible DXVK into the engine via
+`.github/workflows/engine-bundle.yml`, so the engine archive ships DXVK DLLs that
+`enableDXVK` can copy into a bottle. This is **not** a local one-off — it goes
+through the **full engine re-version → sign → promote-to-prod cycle**:
+`engine-bundle.yml` (build + `sign-engine.sh` ad-hoc Mach-O signing + smoke test
++ signed manifest, no auto-publish) → human test the artifact → `engine-promote-prod.yml`
+(upload archive to R2 `engine/prod/archives/`, then overwrite the signed manifest)
+→ bump `engine-version.txt`. Note: DXVK ships PE `.dll` files (NOT Mach-O), so
+`sign-engine.sh` skips them — but they must land in the archive tree where
+`enableDXVK` looks. **Blocked on Checkpoint D** (R2 not yet stood up) for actual
+prod promotion; can be built + locally tested before that.
+
+**Proven inputs (from this session):** engine 11.9 already has the Vulkan→Metal
+substrate — `libMoltenVK.dylib` (x86_64, v1.4.1, Vulkan 1.4.334) + `winevulkan`;
+probe enumerated the M1 Pro GPU via Metal. So DXVK only needs to be *added*; the
+target it renders to is confirmed working.
+
+**Open questions to research first:**
+1. **Which DXVK build is MoltenVK-compatible?** MoltenVK doesn't support every
+   Vulkan feature DXVK assumes — need a DXVK release/fork known to work on
+   MoltenVK (e.g. DXVK-macOS / the CrossOver/Gcenx-style build), matching the
+   engine's Vulkan 1.4.334 / MoltenVK 1.4.1 and **x86_64** (engine is x86_64 Wine
+   under Rosetta — DXVK DLLs are PE, but verify the targeted GAPI/arch).
+2. **How DXVK gets enabled per-bottle.** There's an existing `dxvkConfig.dxvk`
+   setting + an `enableDXVK(bottle)` that copies DXVK `{x64,x32}` DLLs into
+   system32/syswow64. Confirm/wire it to also set a **`d3d9=native,builtin`
+   DLL override** (DXVK provides d3d9; mirror the `dwrite=builtin` override
+   pattern `JavaAppDetector` already uses). Decide whether SWG bottles auto-enable
+   DXVK (it's a D3D9 game) or it's user-toggled.
+3. **Promotion sequence / safety** — re-confirm the archive layout
+   `enableDXVK` expects (`<libraryFolder>/DXVK/{x64,x32}`), and that adding DXVK
+   doesn't change `engine-manifest.json` schema (just a new file set + new
+   version). Roll-forward only; prior archives retained for rollback.
+
 ## 🛠 Build gotcha — xcodebuild -destination fixes a rebuild hang (2026-05-29)
 
 A bare `xcodebuild -scheme Crosswire -configuration Debug -derivedDataPath …
