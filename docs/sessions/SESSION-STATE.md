@@ -105,6 +105,36 @@ during the dispatcher's context save/restore).
 - Refs: winehq MRs !8659, !10419, !10232, !4914; Whisky #270/#851 (Apple-Silicon
   `thread_get_state`); JDK-8271251. Watchdog keeps the download going meanwhile.
 
+#### PATH 2 (newer/WoW64 engine) — RULED OUT (2026-05-31 research)
+- **We are ALREADY new-WoW64.** Engine has `wow64.dll`/`wow64win.dll`/`wow64cpu.dll`
+  and **no `i386-unix` tree**; Gcenx builds with `--enable-archs=i386,x86_64` =
+  unified new-WoW64. There is no old→new-WoW64 switch to make.
+- **WoW64 mode is NOT the lever.** Host thread suspension is **SIGUSR1-based in
+  `dlls/ntdll/unix/signal_x86_64.c` regardless of WoW64 mode**; new-WoW64 only moves
+  the *Windows-visible* CONTEXT to `wow64.dll` (PE side), not the host suspend/resume
+  that Rosetta corrupts. A newer Gcenx *version* (11.9 is already latest, 2026-05-17)
+  won't fix it — we already carry the standard suspend fixes (!8659, !10419).
+- **The real lever is FEX, not Rosetta.** CrossOver 26's arm64 path uses **FEX +
+  ARM64EC** (not Rosetta), which sidesteps the Rosetta `x86_FLOAT_STATE64` suspension
+  corruption entirely — but CrossOver's engine is **commercial, GPL-non-redistributable**;
+  we can't ship it. No mature **arm64/FEX Wine** prebuilt exists for macOS to self-build/ship.
+- **Medium-term risk:** Rosetta 2 is slated for removal ~macOS 27/28 → the whole
+  x86_64-via-Rosetta engine approach has a shelf life; FEX is the long-term escape.
+- **Note:** the SWG JRE is **32-bit** (`jjs.exe` PE32/i386), so #93 is the 32-bit
+  guest thread's context corrupted during SIGUSR1 suspension under Rosetta.
+
+#### → Remaining options for #93 (decision pending)
+1. **Path 1 — localized hand-patch** of the Rosetta AVX/`x86_FLOAT_STATE64` suspension
+   path in `signal_x86_64.c` (gate/repair extended-state save-restore under Rosetta).
+   Only self-built option, but **deep + unproven** (no upstream fix exists for this
+   exact Rosetta corruption — we'd be inventing one). Its own focused session;
+   instrument + verify against the stuck download (preserved at 39%); don't patch blind.
+2. **Accept #93 as a Rosetta limitation** for now: keep the safepoint-flag mitigation +
+   a restart band-aid, and treat **FEX (off-Rosetta)** as the real long-term fix
+   (matches where CrossOver and the Rosetta-removal timeline point).
+3. **CrossOver as a diagnostic** (not shippable): if SWG/JavaFX runs clean under
+   CrossOver 26, that *confirms* FEX-vs-Rosetta is the cure and sets the roadmap.
+
 ## 🧹 Deck-clearing session — safety + polish (2026-05-30, low-risk, engine untouched)
 
 Independent low-risk items, each its own commit. No engine / build-pipeline /
