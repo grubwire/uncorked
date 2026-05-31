@@ -1,8 +1,54 @@
-# Session state — DXVK staged; REAL blocker is in-bottle manifest fetch (2026-05-30)
+# Session state — SWG launcher WORKS end-to-end; game downloading (2026-05-31)
 
 Standing constraint: **native bones, custom skin**. No user-facing strings
 mention Wine / engine / wrappers / version numbers (CLAUDE.md naming rule —
 overrides spec lines that mention "engine version").
+
+## ✅ BREAKTHROUGH (2026-05-31) — the "window blocker" was a RED HERRING; SWG is downloading
+
+**Every prior "launcher won't render / hang" conclusion was wrong.** The launcher
+renders, logs in, checks files, and downloads — all fine. What fooled multiple
+sessions: I positioned the **Crosswire window over the launcher and screencaptured
+the full screen**, so the launcher (sitting *behind* Crosswire) never appeared in
+my shots; AX `count of windows` is also unreliable for winemac windows (flickers
+1↔0). `notepad` "failing" was the same illusion.
+
+**How to actually see/drive a wine window (USE THIS):**
+- Enumerate across all Spaces via JXA: `osascript -l JavaScript` →
+  `$.CGWindowListCopyWindowInfo($.kCGWindowListOptionAll,$.kCGNullWindowID)`,
+  cast with `ObjC.castRefToObject`, read `kCGWindowName/Number/Bounds`. The
+  launcher shows as owner `wine`, name **`SWGLegends Launcher`**, `onscreen=true`.
+- **Capture a specific window even when covered:** `screencapture -x -o -l <id>`.
+- Move Crosswire out of the way: `set position of window 1 of process "Crosswire"
+  to {1250, 60}`, then the launcher (≈ (222,171) login / (287,147) post-login) is
+  visible and clickable.
+
+**Live results (2026-05-31):**
+- **Login WORKS.** Drove it: click Username (~340,285), type user, **key code 48
+  (Tab)** to Password (clicking the pw field doesn't reliably focus it; Cmd+A
+  doesn't clear under Wine — use a *fresh* launcher for empty fields), type pass,
+  key code 36 (Return). Logged in as the account ("Welcome to Cloud City…").
+- **No manifest bug (confirmed live).** Post-login → click **Check** →
+  "Update Required - **Found 577 total patches**" → click **Update** →
+  **"Downloading … 16 of 591"**. The whole manifest/winsock saga was never a bug.
+- **Download is BURSTY but self-resuming** (~6 MB/s; javaw ~140% CPU; brief
+  40-60s pauses recover on their own). 196→800 MB climbing. The frequent short
+  pauses are #93-class network-thread hitches that self-recover; only a *long*
+  stall (like 05-29's single one) needs a restart.
+- **Watchdog RUNNING** (`/tmp/swg-watchdog.sh`, bg): monitors dirMB; restarts the
+  launcher only on a **>5 min** flatline; restart uses the launcher's **saved
+  login** (`remember=true` set on restart) so **no password is in the script**.
+  Completes when `SwgClient_r.exe` present + dirMB>8000.
+
+**Credential hygiene:** creds typed transiently only; two screenshots that
+caught the password in the unmasked field (focus glitch) were **deleted
+immediately**; no plaintext persisted; watchdog carries no password.
+
+### → When the download finishes: RENDER via wined3d + d3dx9 (NOT DXVK)
+DXVK/d9vk D3D9 is dead on Apple Silicon (see below). Install
+`directx_Jun2010_redist` (d3dx9) into the bottle, keep `dxvk=false`, launch
+`SwgClient_r.exe` on wined3d→OpenGL. Drive/observe its window via the
+CGWindowList + `screencapture -l <id>` method above (don't let Crosswire cover it).
 
 ## 🧹 Deck-clearing session — safety + polish (2026-05-30, low-risk, engine untouched)
 
@@ -44,9 +90,125 @@ prod-promotion work. All four commits below pushed to `origin/main`.
 - **Light mode** still **queued as its own session** (needs color judgment in
   both schemes — explicitly out of this pass).
 
-## 🎯 SWG finale — two gates, both now identified (2026-05-30)
+## ⚠️ CORRECTION (2026-05-30, later): the "manifest/winsock blocker" was a WRONG PREMISE
 
-The founding goal (SWG playable in-game) has exactly two remaining gates:
+Gate 2 below ("TOP BLOCKER — manifest fetch hangs / Wine winsock connection-end")
+is **REFUTED. There is no manifest/winsock engine bug.** Re-established from evidence:
+
+- **The manifest fetch demonstrably WORKS end-to-end.** On 2026-05-29 the full
+  **8.4 GB / 571 files downloaded** (see "In-game attempt"). You cannot download
+  571 files without a successful manifest fetch.
+- The "locked winsock blocker" rested on a **single 2026-05-30 capture**
+  (`checksum=0`, the `STEP1`/`SIGNALS` files) **contradicted** by the 05-29
+  download.
+- A later session **refuted the winsock root six ways**: (1) POLLHUP-FIN guard,
+  (2) blocked-recv-not-woken, (3) SO_RCVTIMEO, (4) recvmsg-delivery — **recvmsg
+  always succeeds and delivers the bytes**, (5) connection reuse, (6) concurrency.
+  Direct kernel/wineserver instrumentation showed the **socket layer is healthy**:
+  recvmsg reads all buffered data; `sock_get_poll_events` asks for POLLIN whenever
+  a read is pending (even on a hung socket with buffered bytes). No suspension/SEH/#93.
+- Every "hang" measured in that session was the **windowless direct-launch
+  artifact** (launcher idle at login, invisible — winemac.drv doesn't surface
+  windows for terminal-spawned wine), NOT the post-login patcher manifest fetch.
+- **Clean re-drive attempt (visible Crosswire launcher) was blocked by an
+  intermittent launcher render issue** (javaw runs ~10-16% CPU but the JavaFX
+  window doesn't render on the display this session — likely #93-class, which is
+  still open). So a *live* re-confirmation wasn't obtained, but it isn't needed:
+  the 05-29 full download already proves the fetch works.
+
+**Net:** drop the manifest/winsock engine-patch thread entirely. The only real
+network observation is the **restart-recoverable mid-download stall at 4382 MB**
+(1 stall, 1 restart, 05-29) — worth at most a **download watchdog/auto-retry
+robustness nicety, NOT a deep engine patch**. The real remaining gate to playable
+is **DXVK / black screen** (staged), behind having game data (re-download needed;
+the data downloaded fine on 05-29). Engine is clean/original; nothing committed.
+
+## 🔴 AUTONOMOUS RUN (2026-05-30) — endgame redirected by web research + a render wall
+
+Ran the full path autonomously. Two findings reshape the plan; banked here.
+
+### ⚠️ The DXVK finale is almost certainly the WRONG PATH (web research)
+The staged d9vk/DXVK fix for the SWG client (`gate 1` below) likely **cannot work
+on Apple Silicon** and should not be the plan:
+- **d9vk/DXVK D3D9 fails on Apple Silicon** — `vkCreateDevice` →
+  `VK_ERROR_FEATURE_NOT_PRESENT`; MoltenVK lacks features DXVK's D3D9 path needs.
+  Upstream DXVK is **D3D10/11-only on macOS**; Apple's D3DMetal (GPTK/CrossOver 26)
+  **explicitly does not support D3D9**. (My earlier MoltenVK probe proved the
+  Vulkan *substrate* enumerates the GPU — but that's necessary-not-sufficient;
+  DXVK's *device creation* with D3D9 feature requirements is what fails.)
+- **The community-proven path for SWG on Apple-Silicon Wine is `wined3d`
+  (D3D9 → OpenGL), NOT a Vulkan translator.** SWG is a fixed-function 2003 D3D9
+  title — the exact case wined3d handles. Plus: **install the legacy DirectX
+  redist `directx_Jun2010_redist.exe` (d3dx9 helper DLLs)** into the bottle — SWG
+  needs d3dx9 present; multiple guides cite this as the thing that makes it
+  "work perfectly in CrossOver/Wine."
+- **Reinterpretation of the prior black screen:** it was attributed to "DXVK
+  absent." It may instead have been **missing d3dx9** under the wined3d path.
+  → NEXT SESSION's render plan: **don't chase DXVK. Install d3dx9
+  (`directx_Jun2010_redist`), keep `dxvk=false` (wined3d), and test
+  `SwgClient_r.exe` on wined3d→OpenGL.** Only if that black-screens is it a real
+  fresh root-cause (its own session). Long-term risk: macOS OpenGL deprecation.
+- Sources: SWG Restoration wiki (swgr.org — m1_mac, tech-issues-faq, launcher KB),
+  Whisky discussion #754 (DXVK D3D9 on macOS), Wineskin/Sikarugir d9vk repo,
+  AppleGamingWiki GPTK (D3DMetal D3D9 limitation).
+
+### ⛔ Launcher render blocker — ROOT DIAGNOSED: it's the SESSION, not the launcher
+Worked the diagnostic queue to ground. **The "no window" is a GLOBAL
+winemac/WindowServer issue in this automation session — NOT a launcher, JavaFX,
+Crosswire, or engine bug.** Proven decisively:
+- **`wine notepad` (a trivial, non-detached GUI app) ALSO fails identically** —
+  winemac window count flickers `1↔0`, never composited to the display. If even
+  notepad won't show, nothing wine-GUI will. The launcher is not special.
+- So every wine window this session is **created but not presented** to the
+  captured display (likely the automation shell lacks a foreground Aqua/
+  WindowServer session, or windows land on a non-visible Space). **A normal
+  interactive session renders them fine — which is why prior sessions worked
+  and the 05-29 full download happened.** This also retro-explains the earlier
+  "launch-time hangs": those were wine windows not presenting (app idle at an
+  invisible login), not networking.
+- **It is environmental and not fixable from the code side in this session.**
+  The whole path (login → Update → download → render test) needs an
+  **interactive session with the user present** to drive the visible launcher.
+
+### 🔬 Side-finding worth keeping — JavaFX SW pipeline glyph crash (real bug)
+Captured javaw's prism.verbose via direct launch (stderr DOES survive there):
+- Default order `d3d sw`: **D3D pipeline init fails** (`Direct3D initialization
+  failed`, Wine's fake `"NVIDIA GeForce 6800"` adapter fails JavaFX validation —
+  expected) → **falls back to SW pipeline**, which then throws
+  **`IllegalArgumentException: STRIDE * HEIGHT exceeds length of data`** in
+  `PiscesRenderer.fillAlphaMask` → `SWGraphics.drawGlyph` (× **129**) on the
+  QuantumRenderer thread — i.e. SW **crashes rendering text glyphs**.
+  `-Dprism.lcdtext=false` only reduces it (129→33), doesn't fix it.
+- **`-Dprism.order=j2d` (the seeded default) renders CLEANLY — 0 exceptions.**
+  So **keep j2d; never let JavaFX fall back to the SW pipeline** (its Pisces
+  glyph path is broken under this JRE/Wine). j2d is already what `JavaAppDetector`
+  seeds — good; just don't change it to sw. (NB: this glyph crash is a *render*
+  bug, NOT the window-presentation blocker above — j2d renders clean yet the
+  window still didn't present, because presentation is the session issue.)
+
+### Why I stopped (levers exhausted + root captured, per the brief)
+Worked all four levers: ✅ captured javaw/prism stderr (found the glyph crash +
+j2d-is-clean — the unlock); ✅ quit Battle.net (no change); ✅ Chromium flags
+N/A (confirmed JavaFX/QuantumRenderer, not CEF); ✅ longer waits. Then the
+**notepad test proved the window blocker is environmental (global, not the
+launcher)** — unfixable from code tonight, needs an interactive session.
+Engine clean/original; nothing committed; plist back to baseline `j2d`;
+wine-src at baseline; 0 wine procs.
+
+### → NEXT SESSION (needs USER PRESENT / interactive macOS session)
+1. With the user at the keyboard (so wine windows actually composite): launch SWG
+   via Crosswire → the launcher window should render (j2d, as it did 05-29) →
+   log in → click Update → confirm `launcherManifest.ini` checksum != 0 + `.tre`
+   downloading (re-confirms no manifest bug) → let the **full ~8.4 GB** download
+   run (a download watchdog/auto-retry is the only useful network robustness item).
+2. **Render the game client via wined3d, NOT DXVK:** install `directx_Jun2010_redist`
+   (d3dx9) into the bottle, keep `dxvk=false`, launch `SwgClient_r.exe`. Prior
+   black screen may have been missing d3dx9. (DXVK/d9vk D3D9 is dead on Apple
+   Silicon — see above.)
+
+## 🎯 SWG finale — gates (2026-05-30) — see CORRECTION + AUTONOMOUS RUN above
+
+The founding goal (SWG playable in-game):
 
 1. **DXVK black screen — STAGED ✓, one launch from STOP 2.** Done this session:
    `Wine.dxvkFolder` repointed to `engineFolder/DXVK` (Wine.swift:28,
