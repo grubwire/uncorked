@@ -71,6 +71,40 @@ reproduction (it stalls on #93), so a candidate ntdll patch can be verified by
 swapping it in and seeing the stalls stop. **Local test only — engine commit/
 promote needs the user's eyes (and prod is blocked on Checkpoint D).**
 
+#### #93 diagnosis (2026-05-31 research + source) — pinned, but NOT a quick cherry-pick
+Mechanism CONFIRMED (web research + Wine source): the **SIGUSR1-mid-syscall
+suspension context-corruption class**. HotSpot suspends threads for safepoints via
+`SuspendThread` → Wine `send_thread_signal(SIGUSR1)`; if SIGUSR1 lands while the
+thread is in a syscall (our `recv`), the captured context is inconsistent →
+corrupt-on-resume → crash (`0xfffffcc8`/ntdll AV) or hang (recv never resumes = the
+download stall). Confirmed at `usr1_handler` `is_inside_syscall` branch
+(`signal_x86_64.c:2595`). Named upstream fixes: **MR !8659** (force CS=cs64_sel when
+a mid-syscall signal carries kernel CS 0x07) and **!10419** (defer/rewind SIGUSR1
+during the dispatcher's context save/restore).
+- **BUT both standard fixes are ALREADY in Gcenx 11.9:** CS-selector fix at
+  `init_handler:813` (with the note *"Only applies on Intel, not under Rosetta"*);
+  dispatcher-race handling present (`RESTORE_FLAGS_INCOMPLETE_FRAME_CONTEXT` +
+  `fixup_frame_fpu_state`, lines 476/2609/3393). So the usual cherry-pick is moot.
+- **So #93 persists for a Rosetta-specific reason the standard fixes don't cover.**
+  The CS fix is a no-op under Rosetta (CS isn't 0x07). Remaining suspect: the
+  **extended-state (AVX/XSAVE / `thread_get_state x86_FLOAT_STATE64`) handling during
+  suspension** — the `usr1_handler` xstate dance (lines ~2616-2624) + `xstate_extended_features`
+  which has **no Rosetta gate** (set from `XState.EnabledFeatures` ~547) while Rosetta
+  fakes XGETBV/XSAVE (cf. existing CW HACK 23427). Research independently flagged
+  "Rosetta's one independent fault = `thread_get_state x86_FLOAT_STATE64` (AVX)."
+  **HYPOTHESIS, not verified — do NOT patch blind (winsock lesson).**
+- **Two paths for the focused #93 session (don't grind it tired):**
+  1. Instrument the Rosetta suspension path (confirm `xstate_extended_features`≠0 and
+     that AVX save/restore corrupts the suspended `recv` thread), then a localized
+     `signal_x86_64.c` patch gating extended-xstate off under Rosetta; verify against
+     the live download. Subtle/risky.
+  2. **Upgrade the engine to a newer / WoW64 Wine** (≥11.5 / Kron4ek-style) carrying
+     the full fix set + better Rosetta handling — the research's lean; cleaner but a
+     bigger change (new engine version + re-bundle). **Likely the better long-term
+     "seamless" answer.**
+- Refs: winehq MRs !8659, !10419, !10232, !4914; Whisky #270/#851 (Apple-Silicon
+  `thread_get_state`); JDK-8271251. Watchdog keeps the download going meanwhile.
+
 ## 🧹 Deck-clearing session — safety + polish (2026-05-30, low-risk, engine untouched)
 
 Independent low-risk items, each its own commit. No engine / build-pipeline /
