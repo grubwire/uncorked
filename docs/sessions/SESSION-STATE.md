@@ -50,6 +50,27 @@ DXVK/d9vk D3D9 is dead on Apple Silicon (see below). Install
 `SwgClient_r.exe` on wined3d→OpenGL. Drive/observe its window via the
 CGWindowList + `screencapture -l <id>` method above (don't let Crosswire cover it).
 
+### ⚠️ #93 stalls are FREQUENT this session — and #93 is THE "seamless" fix
+The download stalls every few GB (vs 1 stall in all of 8.4 GB on 05-29): the JVM's
+network threads stop reading mid-download → ~500 KB/conn piles up in the kernel
+(verified via netstat Recv-Q), launcher freezes at "Downloading X of N", conns→0,
+javaw CPU low. This is the #93 JVM↔Wine safepoint/thread-suspension bug hitting
+the network threads (the `3fad7e6` safepoint flags only mitigate it). Restart
+recovers each time (progress persists: 577→447 remaining after ~130 files), so a
+watchdog (`/tmp/swg-watchdog2.sh`, bg) auto-restarts on a real stall using
+`remember=true` saved-creds pre-fill (no password in the script).
+
+**DECISION (user, 2026-05-31): fix #93 at the engine level — it's the only path
+to a truly seamless experience** (no restart babysitting; also fixes in-game
+stability, not just the download). The watchdog is a band-aid; a built-in
+auto-recovery feature is at most a secondary safety net layered on *after* the
+root is understood. **#93 root (from prior diagnosis): Wine ntdll thread-suspension
+/ SEH for the JVM safepoint** (`NtSuspendThread`/`NtSetContextThread`/exception
+dispatch) — compare Gcenx 11.9 vs CrossOver/upstream. The live download IS the
+reproduction (it stalls on #93), so a candidate ntdll patch can be verified by
+swapping it in and seeing the stalls stop. **Local test only — engine commit/
+promote needs the user's eyes (and prod is blocked on Checkpoint D).**
+
 ## 🧹 Deck-clearing session — safety + polish (2026-05-30, low-risk, engine untouched)
 
 Independent low-risk items, each its own commit. No engine / build-pipeline /
